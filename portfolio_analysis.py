@@ -12,48 +12,20 @@ GMAIL_USER        = os.environ["GMAIL_USER"]          # your Gmail address
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"] # Gmail App Password (not your real password)
 RECIPIENT_EMAIL   = os.environ["RECIPIENT_EMAIL"]     # where to send the report (can be same as GMAIL_USER)
 
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1qbb0x_kNtIUp4cq-_O9uFi6stbcSPwTeTnXOd1DbzOo/edit?usp=sharing"
 TODAY = datetime.date.today().strftime("%Y-%m-%d")
 
-# ── SYSTEM PROMPT ─────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """You are a personal financial analyst assistant. You will perform a detailed 
-portfolio analysis for a 29-year-old investor based in Bucharest, Romania.
+# ── LOAD SKILL ────────────────────────────────────────────────────────────────
+skill_path = os.path.join(os.path.dirname(__file__), "SKILL.md")
+with open(skill_path, "r", encoding="utf-8") as f:
+    SKILL_CONTENT = f.read()
 
-Romanian Fiscal Code context:
-- Dividends/gains must be declared in "Declaratia Unica" even if the broker pays taxes on behalf of the user.
-- Tax on capital gains: 3% for positions held > 365 days, 6% for positions held < 365 days.
-- The investor uses Romanian brokers or brokers with offices in Romania (XTB, TradeVille).
-
-Portfolio structure:
-1. ETFs portfolio (EUR, XTB broker): 30% S&P 500, 20% STOXX Europe 600, 15% Global REIT, 10% Canada, 10% EM, 10% Bonds, 5% Small Cap. Monthly investment of 1k-2k EUR. Long-term hold (10-15 years).
-2. Individual stocks (USD, XTB broker): Wants to SELL PTC, OSPN, OTEX, LULU (after 365 days for tax reasons). Wants to HOLD/GROW AMZN, ADBE. Focus on growth, no dividends preferred.
-3. Romania portfolio (RON, TradeVille): 250 RON/month in BET ETF. Romanian Government Bonds as inflation hedge.
-
-Rules:
-- Main currency is EURO. Pay close attention to EUR/USD/RON conversions.
-- Individual stocks: focus on US market only.
-- The portfolio Google Sheet has sheets: Summary, Tranzactii (transactions with dates), Utilities (exchange rates).
-- Output must be a COMPLETE, SELF-CONTAINED HTML document.
-- The HTML title must be: portfolio-analysis-""" + TODAY + """
-
-Your analysis must include:
-1. Portfolio overview with current holdings and total value in EUR
-2. Tax considerations (which positions are >365 days, capital gains implications)
-3. Global news summary affecting the portfolio (with links)
-4. Stock-specific news for holdings
-5. Romanian political/economic news
-6. Forecast and recommendations
-7. Watchlist: stocks to consider buying or warning about existing holdings
-
-Use web search to find current news and prices. Be specific, data-driven, and actionable."""
+# Inject today's date into the skill content so the HTML title is always current
+SYSTEM_PROMPT = SKILL_CONTENT.replace("{{TODAY}}", TODAY)
 
 # ── USER PROMPT ───────────────────────────────────────────────────────────────
 USER_PROMPT = f"""Please perform a full portfolio analysis for today, {TODAY}.
 
-The portfolio data is in this Google Sheet (publicly accessible, no login required):
-{SPREADSHEET_URL}
-
-Access the sheet directly to read:
+Access the Google Sheet defined in the skill to read:
 - The "Summary" sheet for current holdings
 - The "Tranzactii" sheet for transaction history and position dates
 - The "Utilities" sheet for exchange rates
