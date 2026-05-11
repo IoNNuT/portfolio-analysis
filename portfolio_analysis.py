@@ -55,6 +55,17 @@ Here is the live data fetched directly from my portfolio Google Sheet:
 Use this data as the source of truth for all holdings, values, and exchange rates.
 Then search for current news relevant to the portfolio.
 
+IMPORTANT: You must complete ALL of the following sections before finishing — do not stop early:
+1. Portfolio Overview
+2. ETF Portfolio
+3. Individual Stocks
+4. Romania Portfolio
+5. Romanian Tax Notes
+6. Global News (search for real current news)
+7. Stock-Specific News (search for each holding)
+8. Romania News
+9. Watchlist & Alerts
+
 Return a complete, polished HTML report with the title "portfolio-analysis-{TODAY}".
 The HTML must be fully self-contained (inline CSS, no external dependencies except Google Fonts if needed).
 Make it visually professional — use a dark financial dashboard aesthetic."""
@@ -66,13 +77,12 @@ def run_analysis() -> str:
     headers = {
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "interleaved-thinking-2025-05-14",
         "content-type": "application/json",
     }
 
     payload = {
         "model": "claude-sonnet-4-6",
-        "max_tokens": 16000,
+        "max_tokens": 32000,
         "system": SYSTEM_PROMPT,
         "tools": [
             {
