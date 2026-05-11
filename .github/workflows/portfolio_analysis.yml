@@ -1,1 +1,40 @@
-test
+name: Weekly Portfolio Analysis
+
+on:
+  # Runs every Friday at 08:00 UTC (10:00 Bucharest time / 11:00 in summer)
+  schedule:
+    - cron: "0 8 * * 5"
+
+  # Also allows you to trigger it manually from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run portfolio analysis
+        env:
+          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_USER:           ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD:   ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL:      ${{ secrets.RECIPIENT_EMAIL }}
+        run: python portfolio_analysis.py
+
+      - name: Upload HTML report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-analysis-${{ github.run_id }}
+          path: portfolio-analysis-*.html
+          retention-days: 90   # keep the last 90 days of reports on GitHub
