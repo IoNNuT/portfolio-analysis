@@ -1,12 +1,9 @@
 name: Weekly Portfolio Analysis
 
 on:
-  # Runs every Friday at 08:00 UTC (10:00 Bucharest time / 11:00 in summer)
   schedule:
-    - cron: "0 8 * * 5"
-
-  # Also allows you to trigger it manually from the GitHub Actions tab
-  workflow_dispatch:
+    - cron: "0 8 * * 5"   # Every Friday 08:00 UTC = 10:00 Bucharest (11:00 summer)
+  workflow_dispatch:        # Manual trigger from GitHub Actions tab
 
 jobs:
   analyze:
@@ -22,19 +19,34 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests feedparser
+
+      # Restore the SQLite article cache from previous runs
+      - name: Restore article cache
+        uses: actions/cache@v4
+        with:
+          path: seen_articles.db
+          key: article-cache-${{ runner.os }}
+          restore-keys: article-cache-
 
       - name: Run portfolio analysis
         env:
-          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
-          GMAIL_USER:           ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD:   ${{ secrets.GMAIL_APP_PASSWORD }}
-          RECIPIENT_EMAIL:      ${{ secrets.RECIPIENT_EMAIL }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_USER:          ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENT_EMAIL:     ${{ secrets.RECIPIENT_EMAIL }}
         run: python portfolio_analysis.py
+
+      # Save the updated cache so next run knows which articles were already seen
+      - name: Save article cache
+        uses: actions/cache@v4
+        with:
+          path: seen_articles.db
+          key: article-cache-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload HTML report as artifact
         uses: actions/upload-artifact@v4
         with:
           name: portfolio-analysis-${{ github.run_id }}
           path: portfolio-analysis-*.html
-          retention-days: 90   # keep the last 90 days of reports on GitHub
+          retention-days: 90
