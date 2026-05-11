@@ -14,27 +14,30 @@ GMAIL_USER         = os.environ["GMAIL_USER"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 RECIPIENT_EMAIL    = os.environ["RECIPIENT_EMAIL"]
 
-TODAY    = datetime.date.today().strftime("%Y-%m-%d")
-DB_PATH  = "seen_articles.db"   # SQLite cache — persists in GitHub Actions workspace
+TODAY   = datetime.date.today().strftime("%Y-%m-%d")
+DB_PATH = "seen_articles.db"
 
-# Portfolio symbols used for keyword filtering
+# Portfolio keywords for filtering general feeds
 PORTFOLIO_SYMBOLS = [
-    "AMZN", "ADBE", "PTC", "OSPN", "OTEX", "LULU",   # individual stocks
-    "CSPX", "EXSA", "IWDP", "BET",                     # ETFs
-    "Amazon", "Adobe", "Lululemon", "OpenText",         # company names
-    "S&P", "STOXX", "REIT", "Romania", "RON", "EUR",   # macro keywords
+    "AMZN", "ADBE", "PTC", "OSPN", "OTEX", "LULU",
+    "CSPX", "EXSA", "IWDP", "BET",
+    "Amazon", "Adobe", "Lululemon", "OpenText",
+    "S&P", "STOXX", "REIT", "Romania", "RON", "EUR",
+    "Fed", "ECB", "inflation", "interest rate", "recession",
 ]
 
-MAX_ITEMS_TOTAL = 50   # hard cap on items sent to Claude
+MAX_ITEMS_TOTAL  = 30   # hard cap — keeps prompt size manageable
+MAX_PER_FEED     = 3    # max items per individual feed
+SUMMARY_MAX_CHARS = 150 # keep summaries short to save tokens
 
 # ── RSS FEED DEFINITIONS ──────────────────────────────────────────────────────
+# Removed duplicate Google News feeds for same tickers — Yahoo Finance is enough
 RSS_FEEDS = {
     "General Financial News": [
         ("MarketWatch",   "https://feeds.marketwatch.com/marketwatch/topstories/"),
         ("CNBC",          "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
         ("Seeking Alpha", "https://seekingalpha.com/feed.xml"),
         ("Reuters",       "https://feeds.reuters.com/reuters/businessNews"),
-        ("Investing.com", "https://www.investing.com/rss/news.rss"),
     ],
     "Individual Stocks": [
         ("AMZN", "https://finance.yahoo.com/rss/headline?s=AMZN"),
@@ -43,21 +46,14 @@ RSS_FEEDS = {
         ("OSPN", "https://finance.yahoo.com/rss/headline?s=OSPN"),
         ("OTEX", "https://finance.yahoo.com/rss/headline?s=OTEX"),
         ("LULU", "https://finance.yahoo.com/rss/headline?s=LULU"),
-        # Google News per ticker (broader coverage)
-        ("AMZN-GNews", "https://news.google.com/rss/search?q=AMZN+stock&hl=en-US&gl=US&ceid=US:en"),
-        ("ADBE-GNews", "https://news.google.com/rss/search?q=ADBE+stock&hl=en-US&gl=US&ceid=US:en"),
-        ("LULU-GNews", "https://news.google.com/rss/search?q=LULU+stock&hl=en-US&gl=US&ceid=US:en"),
     ],
     "ETFs & Markets": [
-        ("S&P500",     "https://finance.yahoo.com/rss/headline?s=^GSPC"),
-        ("CSPX",       "https://finance.yahoo.com/rss/headline?s=CSPX.L"),
-        ("EXSA",       "https://finance.yahoo.com/rss/headline?s=EXSA.DE"),
-        ("IWDP-REIT",  "https://finance.yahoo.com/rss/headline?s=IWDP.L"),
+        ("S&P500", "https://finance.yahoo.com/rss/headline?s=^GSPC"),
     ],
     "Romania": [
-        ("Profit.ro",  "https://www.profit.ro/rss"),
-        ("Ziare.com",  "https://www.ziare.com/rss/business.xml"),
-        ("GNews-RO",   "https://news.google.com/rss/search?q=Romania+economy&hl=en-US&gl=US&ceid=US:en"),
+        ("Profit.ro", "https://www.profit.ro/rss"),
+        ("Ziare.com", "https://www.ziare.com/rss/business.xml"),
+        ("GNews-RO",  "https://news.google.com/rss/search?q=Romania+economy&hl=en-US&gl=US&ceid=US:en"),
     ],
 }
 
@@ -65,7 +61,6 @@ FEED_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; PortfolioBot/1.0)"}
 
 # ── SQLITE CACHE ──────────────────────────────────────────────────────────────
 def init_db() -> sqlite3.Connection:
-    """Create (or open) the SQLite cache and return a connection."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS seen_articles (
@@ -73,7 +68,6 @@ def init_db() -> sqlite3.Connection:
             seen_on TEXT NOT NULL
         )
     """)
-    # Clean up entries older than 14 days to keep the DB small
     conn.execute(
         "DELETE FROM seen_articles WHERE seen_on < ?",
         (str(datetime.date.today() - datetime.timedelta(days=14)),)
@@ -81,61 +75,44 @@ def init_db() -> sqlite3.Connection:
     conn.commit()
     return conn
 
-def is_seen(conn: sqlite3.Connection, url: str) -> bool:
-    row = conn.execute("SELECT 1 FROM seen_articles WHERE url = ?", (url,)).fetchone()
-    return row is not None
+def is_seen(conn, url): 
+    return conn.execute("SELECT 1 FROM seen_articles WHERE url = ?", (url,)).fetchone() is not None
 
-def mark_seen(conn: sqlite3.Connection, url: str):
-    conn.execute(
-        "INSERT OR IGNORE INTO seen_articles (url, seen_on) VALUES (?, ?)",
-        (url, TODAY)
-    )
+def mark_seen(conn, url):
+    conn.execute("INSERT OR IGNORE INTO seen_articles (url, seen_on) VALUES (?, ?)", (url, TODAY))
     conn.commit()
 
-# ── SYMBOL FILTER ─────────────────────────────────────────────────────────────
-def is_relevant(title: str, summary: str) -> bool:
-    """Return True if the article mentions at least one portfolio keyword."""
+# ── HELPERS ───────────────────────────────────────────────────────────────────
+def strip_html(text):
+    return re.sub(r"<[^>]+>", "", text or "").strip()
+
+def is_relevant(title, summary):
     text = (title + " " + summary).upper()
     return any(sym.upper() in text for sym in PORTFOLIO_SYMBOLS)
 
 # ── RSS PARSER ────────────────────────────────────────────────────────────────
-def strip_html(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text or "").strip()
-
-def fetch_feed(label: str, url: str, conn: sqlite3.Connection,
-               general: bool = False, max_per_feed: int = 8) -> list:
-    """
-    Parse one RSS feed via feedparser.
-    - general feeds: filter by PORTFOLIO_SYMBOLS keywords
-    - stock/etf feeds: accept all items (already ticker-specific)
-    Returns a list of dicts {label, title, summary, link}.
-    """
+def fetch_feed(label, url, conn, general=False):
     try:
         feed = feedparser.parse(url, request_headers=FEED_HEADERS)
         results = []
-        for entry in feed.entries[:30]:   # look at up to 30 raw entries
+        for entry in feed.entries[:20]:
             title   = strip_html(entry.get("title", ""))
-            summary = strip_html(entry.get("summary", entry.get("description", "")))[:250]
+            summary = strip_html(entry.get("summary", entry.get("description", "")))[:SUMMARY_MAX_CHARS]
             link    = entry.get("link", entry.get("id", ""))
-
             if not title:
                 continue
             if is_seen(conn, link or title):
                 continue
             if general and not is_relevant(title, summary):
                 continue
-
             mark_seen(conn, link or title)
-            results.append({"label": label, "title": title,
-                             "summary": summary, "link": link})
-            if len(results) >= max_per_feed:
+            results.append({"label": label, "title": title, "summary": summary, "link": link})
+            if len(results) >= MAX_PER_FEED:
                 break
-
-        print(f"  [{label}] {len(results)} new relevant items")
+        print(f"  [{label}] {len(results)} new items")
         return results
-
     except Exception as e:
-        print(f"  Warning: feed error [{label}]: {e}")
+        print(f"  Warning: [{label}] {e}")
         return []
 
 # ── MAIN NEWS FETCHER ─────────────────────────────────────────────────────────
@@ -154,7 +131,7 @@ def fetch_all_news() -> str:
 
     conn.close()
 
-    # Enforce global 50-item cap — trim proportionally per category
+    # Enforce global cap — trim proportionally per category
     if total > MAX_ITEMS_TOTAL:
         ratio = MAX_ITEMS_TOTAL / total
         for cat in sections:
@@ -164,19 +141,16 @@ def fetch_all_news() -> str:
 
     print(f"[{TODAY}] Total news items after filtering & cap: {total}")
 
-    # Format as plain text for the prompt
-    lines = [f"# News Digest — {TODAY}  ({total} items)\n"]
+    # Format compactly — title + short summary only, no full links (saves tokens)
+    lines = [f"# News Digest — {TODAY} ({total} items)\n"]
     for category, items in sections.items():
         if not items:
             continue
         lines.append(f"\n## {category}")
         for item in items:
-            lines.append(f"\n[{item['label']}] {item['title']}")
+            lines.append(f"[{item['label']}] {item['title']}")
             if item["summary"]:
-                lines.append(f"  {item['summary']}")
-            if item["link"]:
-                lines.append(f"  {item['link']}")
-
+                lines.append(f"  → {item['summary']}")
     return "\n".join(lines)
 
 # ── LOAD SKILL ────────────────────────────────────────────────────────────────
@@ -189,7 +163,7 @@ SYSTEM_PROMPT = SKILL_CONTENT.replace("{{TODAY}}", TODAY)
 # ── FETCH GOOGLE SHEETS DATA ──────────────────────────────────────────────────
 SHEET_ID = "1qbb0x_kNtIUp4cq-_O9uFi6stbcSPwTeTnXOd1DbzOo"
 
-def fetch_sheet_csv(gid: str, name: str) -> str:
+def fetch_sheet_csv(gid, name):
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
     try:
         r = requests.get(url, timeout=30)
@@ -224,7 +198,7 @@ USER_PROMPT = f"""Please perform a full portfolio analysis for today, {TODAY}.
 {utilities_csv}
 ```
 
-## News Digest (pre-fetched & filtered from RSS — max 50 items)
+## News Digest (pre-fetched from RSS — max 30 items)
 {news_digest}
 
 ---
@@ -232,16 +206,17 @@ USER_PROMPT = f"""Please perform a full portfolio analysis for today, {TODAY}.
 Use the portfolio data as the source of truth for holdings, values, and exchange rates.
 Use the news digest as the source of truth for all news — do NOT search the web.
 
-IMPORTANT: Complete ALL sections below — do not stop early:
-1. Portfolio Overview (total value in EUR, allocation breakdown)
-2. ETF Portfolio (holdings, performance, notes)
-3. Individual Stocks (status, tax holding period, buy/sell/hold recommendation)
-4. Romania Portfolio (BET ETF, bonds)
-5. Romanian Tax Notes (positions >365 days, capital gains implications)
-6. Global News (summarise relevant items from the digest)
-7. Stock-Specific News (summarise per-ticker items from the digest)
-8. Romania News (summarise Romanian items from the digest)
-9. Watchlist & Alerts (stocks to watch, risks, opportunities)
+IMPORTANT: You MUST write content for ALL 9 sections. Do not leave any section empty.
+
+1. Portfolio Overview — total value in EUR, allocation breakdown
+2. ETF Portfolio — holdings, performance, notes
+3. Individual Stocks — each stock: current status, days held, tax rate (3% or 6%), buy/sell/hold
+4. Romania Portfolio — BET ETF, bonds update
+5. Romanian Tax Notes — which positions exceed 365 days, estimated tax on unrealised gains
+6. Global News — summarise 3-5 items from the General Financial News section of the digest
+7. Stock-Specific News — summarise news per ticker from the digest
+8. Romania News — summarise items from the Romania section of the digest
+9. Watchlist & Alerts — 3-5 specific opportunities or risks based on the news and holdings
 
 Return a complete, polished HTML report titled "portfolio-analysis-{TODAY}".
 Fully self-contained HTML with inline CSS. Dark financial dashboard aesthetic."""
@@ -261,7 +236,6 @@ def run_analysis() -> str:
         "max_tokens": 16000,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": USER_PROMPT}],
-        # web_search intentionally removed — news pre-fetched via RSS (free)
     }
 
     response = requests.post(
@@ -286,7 +260,7 @@ def run_analysis() -> str:
     return html_report
 
 # ── SAVE HTML ─────────────────────────────────────────────────────────────────
-def save_report(html: str) -> str:
+def save_report(html):
     filename = f"portfolio-analysis-{TODAY}.html"
     with open(filename, "w", encoding="utf-8") as f:
         f.write(html)
@@ -294,7 +268,7 @@ def save_report(html: str) -> str:
     return filename
 
 # ── SEND EMAIL ────────────────────────────────────────────────────────────────
-def send_email(html: str, filename: str):
+def send_email(html, filename):
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Portfolio Analysis — {TODAY}"
     msg["From"]    = GMAIL_USER
@@ -306,7 +280,6 @@ def send_email(html: str, filename: str):
         "plain"
     ))
     msg.attach(MIMEText(html, "html"))
-
     attachment = MIMEText(html, "html")
     attachment.add_header("Content-Disposition", "attachment", filename=filename)
     msg.attach(attachment)
@@ -314,7 +287,6 @@ def send_email(html: str, filename: str):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_USER, RECIPIENT_EMAIL, msg.as_string())
-
     print(f"[{TODAY}] Email sent to {RECIPIENT_EMAIL}")
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
