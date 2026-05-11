@@ -45,7 +45,7 @@ Steps:
 2.  Read carefully the contents of the portfolio
 - make sure all the pages are analysed
 - "Summary" - main sheet, has the current status of all my holdings
-- "Tranzactii" - all the transactions I made (you can find on this page based on date when I opened a position and if it is held for longer than 365 days or not)
+- "Tranzactii" - all the transactions I made (you can find on this page based on date when I opened a position and if it is held for longer than 365 days or not) - this will not be in the CVS exported files because it has too much data
 - Utilities - all kind of information used on other pages, like exchange rates
 3. Understand the structure of the portfolio
 4. Search for the global events that might influence how the assets in my portfolio will perform. Focus on the following areas, and make me a summary. Provide links for all the news.
