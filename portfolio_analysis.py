@@ -82,7 +82,7 @@ def run_analysis() -> str:
 
     payload = {
         "model": "claude-sonnet-4-6",
-        "max_tokens": 32000,
+        "max_tokens": 29900,
         "system": SYSTEM_PROMPT,
         "tools": [
             {
