@@ -208,6 +208,8 @@ Use the news digest as the source of truth for all news — do NOT search the we
 
 IMPORTANT: You MUST write content for ALL 9 sections. Do not leave any section empty.
 
+Be CONCISE on sections 1-5 — use compact tables, no long paragraphs. Reserve space for sections 6-9 which are equally important. Each section should be roughly equal in length.
+
 1. Portfolio Overview — total value in EUR, allocation breakdown
 2. ETF Portfolio — holdings, performance, notes
 3. Individual Stocks — each stock: current status, days held, tax rate (3% or 6%), buy/sell/hold
@@ -233,7 +235,7 @@ def run_analysis() -> str:
 
     payload = {
         "model": "claude-sonnet-4-6",
-        "max_tokens": 16000,
+        "max_tokens": 32000,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": USER_PROMPT}],
     }
@@ -242,7 +244,7 @@ def run_analysis() -> str:
         "https://api.anthropic.com/v1/messages",
         headers=headers,
         json=payload,
-        timeout=300,
+        timeout=500,
     )
 
     if response.status_code != 200:
