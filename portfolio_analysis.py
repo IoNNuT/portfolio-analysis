@@ -22,15 +22,38 @@ with open(skill_path, "r", encoding="utf-8") as f:
 # Inject today's date into the skill content so the HTML title is always current
 SYSTEM_PROMPT = SKILL_CONTENT.replace("{{TODAY}}", TODAY)
 
+# ── FETCH GOOGLE SHEETS DATA ──────────────────────────────────────────────────
+SHEET_ID = "1qbb0x_kNtIUp4cq-_O9uFi6stbcSPwTeTnXOd1DbzOo"
+
+def fetch_sheet_csv(gid: str, name: str) -> str:
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={gid}"
+    response = requests.get(url, timeout=30)
+    if response.status_code != 200:
+        print(f"[{TODAY}] Warning: could not fetch {name} sheet (status {response.status_code})")
+        return f"[{name} data unavailable]"
+    print(f"[{TODAY}] Fetched {name} sheet ({len(response.text)} chars)")
+    return response.text
+
+summary_csv   = fetch_sheet_csv("1633571629", "Summary")
+utilities_csv = fetch_sheet_csv("2066207814", "Utilities")
+
 # ── USER PROMPT ───────────────────────────────────────────────────────────────
 USER_PROMPT = f"""Please perform a full portfolio analysis for today, {TODAY}.
 
-Access the Google Sheet defined in the skill to read:
-- The "Summary" sheet for current holdings
-- The "Tranzactii" sheet for transaction history and position dates
-- The "Utilities" sheet for exchange rates
+Here is the live data fetched directly from my portfolio Google Sheet:
 
-Then search for current news relevant to the portfolio. 
+## Summary (current holdings)
+```
+{summary_csv}
+```
+
+## Utilities (exchange rates)
+```
+{utilities_csv}
+```
+
+Use this data as the source of truth for all holdings, values, and exchange rates.
+Then search for current news relevant to the portfolio.
 
 Return a complete, polished HTML report with the title "portfolio-analysis-{TODAY}".
 The HTML must be fully self-contained (inline CSS, no external dependencies except Google Fonts if needed).
