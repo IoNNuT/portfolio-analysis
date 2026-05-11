@@ -36,7 +36,7 @@ Rules:
 For individual stocks, focus on US, I am not interested in investing in individual stocks from other regions.
 When analysing the portfolio, pay extra attention to currencies. I have investments in EURO/USD/RON. You can find on the Utilities sheet, the conversion rate. 
 The main currency of the portfolio is EURO.
-The analysis must be in HTML format, the title being "portfolio-analysis-<date>".
+The analysis must be in HTML format, the title being "portfolio-analysis-{{TODAY}}".
 
 Steps:
 1. Understand the Romanian fiscal code.
