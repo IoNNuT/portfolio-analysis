@@ -24,6 +24,8 @@ No regular investment. US market only. Growth focus, no dividends preferred.
 
 ### 3. Romania — TradeVille, RON
 - BET ETF: 250 RON/month, hold 10–15 years
+
+### 4. Romania - TradeVille, EURO
 - Romanian Government Bonds: inflation hedge for uncommitted cash
 
 ## Report Format
