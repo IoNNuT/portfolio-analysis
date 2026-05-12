@@ -229,24 +229,25 @@ is_full = portfolio_changed(summary_csv, utilities_csv)
 
 if is_full:
     print(f"[{TODAY}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — all 9 sections:
-1. Portfolio Overview — total value EUR, allocation breakdown
-2. ETF Portfolio — holdings vs target allocation
-3. Individual Stocks — each stock: days held, tax rate (3%/6%), recommendation
-4. Romania Portfolio — BET ETF and bonds
-5. Tax Notes — positions >365 days, estimated capital gains tax
-6. Global News — 3-5 items from digest
-7. Stock-Specific News — per ticker from digest
-8. Romania News — from digest
-9. Watchlist & Alerts — 3-5 opportunities or risks"""
+    analysis_scope = """Perform a FULL analysis — 6 sections only:
+1. Portfolio Overview — total value EUR, all holdings in one compact table (ETFs + stocks + Romania)
+2. Individual Stocks — each stock: days held, tax rate (3%/6%), buy/sell/hold recommendation
+3. Global News — 3-5 items from digest
+4. Stock-Specific News — per ticker from digest
+5. Romania News — from digest
+6. Watchlist & Alerts — 3-5 opportunities or risks
+
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income, positions >365 days detail."""
 else:
     print(f"[{TODAY}] Mode: INCREMENTAL")
-    analysis_scope = """Portfolio UNCHANGED. Sections 1-5: one-line summary each only.
-Focus on sections 6-9 in full detail:
-6. Global News — 3-5 items from digest
-7. Stock-Specific News — per ticker from digest
-8. Romania News — from digest
-9. Watchlist & Alerts — 3-5 opportunities or risks"""
+    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only.
+Focus on sections 3-6 in full detail:
+3. Global News — 3-5 items from digest
+4. Stock-Specific News — per ticker from digest
+5. Romania News — from digest
+6. Watchlist & Alerts — 3-5 opportunities or risks
+
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 
 # ── STEP 1: SONNET ANALYSIS (plain text, cheap output) ───────────────────────
 SONNET_SYSTEM = SKILL_CONTENT
