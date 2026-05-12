@@ -271,7 +271,7 @@ analysis_text = claude_call(
     model      = "claude-sonnet-4-6",
     system     = SONNET_SYSTEM,
     user       = SONNET_USER,
-    max_tokens = 4000,   # plain text needs far fewer tokens than HTML
+    max_tokens = 6000,   # enough for all 9 sections in plain text
 )
 print(f"[{TODAY}] Analysis: {len(analysis_text)} chars")
 
@@ -299,7 +299,7 @@ html_report = claude_call(
     model      = "claude-haiku-4-5-20251001",
     system     = HAIKU_SYSTEM,
     user       = HAIKU_USER,
-    max_tokens = 8000,
+    max_tokens = 12000,
 )
 print(f"[{TODAY}] Report: {len(html_report)} chars")
 
