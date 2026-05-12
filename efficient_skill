@@ -1,0 +1,75 @@
+---
+name: portfolio-analysis
+description: Analyze the user's investment portfolio. Use when the user asks for a portfolio analysis, portfolio review, or investment summary. Fetches data from Google Drive, searches for relevant news, and produces an HTML report.
+---
+
+# Portfolio Analysis Skill
+
+## User Profile (static context)
+- Age 29, Bucharest, Romania. Single, no kids.
+- Income: top 1–5% Romania (~€45k/yr). Risk: average-high.
+- Brokers: XTB (EUR + USD), TradeVille (RON). All Romanian/Romania-registered.
+- W-8BEN: filed.
+
+## Romanian Tax Rules (static context)
+- All gains/dividends → declare in *Declarația Unică* even if broker withholds.
+- Capital gains tax: **3%** if position held >365 days; **6%** if ≤365 days.
+- Foreign broker (no Romanian office) → user must self-withhold & pay. Not applicable here.
+
+## Portfolio Structure (static context)
+| Sub-portfolio | Currency | Broker | Cadence | Goal |
+|---|---|---|---|---|
+| ETFs | EUR | XTB | €1–2k/mo | Hold 10–15+ yrs |
+| Individual stocks | USD | XTB | Irregular | Growth, no dividends |
+| Romania | RON | TradeVille | 250 RON/mo | Long-term BET ETF + inflation-hedge bonds |
+
+ETF split: 30% S&P500 · 20% STOXX600 · 15% Global REIT · 10% Canada · 10% EM · 10% Bonds · 5% Small Cap  
+Stocks to **SELL** (after 365d mark): PTC, OSPN, OTEX, LULU  
+Stocks to **HOLD/GROW**: AMZN, ADBE (and any high-growth, no-dividend US equities)
+
+---
+
+## Execution Protocol
+
+### Step 1 — Read Portfolio
+Fetch the Google Sheet (link provided by user). Read **all sheets**:
+- `Summary` — current holdings snapshot
+- `Utilities` — exchange rates (EUR/USD/RON); use these for all conversions; **report in EUR**
+- `Tranzactii` — transaction history (use to determine holding period >/<365d for tax bracket)
+
+### Step 2 — News Research (run searches in parallel)
+Fetch current info on all four topics simultaneously:
+
+a. **Global macro**: geopolitics, interest rates, inflation, USD/EUR/RON FX trends  
+b. **Stock-specific**: each ticker currently held (earnings, analyst ratings, material news)  
+c. **ETF/sector**: any relevant sector news for held ETFs  
+d. **Romania**: political/fiscal developments affecting RON, BVB, gov bonds, tax law
+
+Provide a **brief summary per topic** with source links.
+
+### Step 3 — Forecast & Positioning
+Based on news, give a forward-looking view:
+- Macro tailwinds/headwinds for the portfolio
+- Specific risks or opportunities per holding
+- Actionable positioning suggestions (e.g., sectors to watch, rebalancing signals)
+
+### Step 4 — Watchlist
+Two lists:
+1. **Stocks to watch** (potential buys): US-only, high-growth, no/low dividend
+2. **Risk alerts**: holdings with deteriorating fundamentals or adverse news
+
+### Step 5 — Generate HTML Report
+Output a single self-contained HTML file.
+
+**Title**: `portfolio-analysis-{TODAY_DATE}`  
+**Sections**:
+1. Portfolio snapshot (holdings table, total value in EUR, allocation %)
+2. Tax status table (each position: entry date, holding days, tax bracket, unrealized G/L)
+3. News summary (with links)
+4. Forecast & recommendations
+5. Watchlist
+
+**Constraints**:
+- All monetary values converted to EUR using rates from `Utilities` sheet
+- Flag any position approaching or past the 365-day threshold
+- Highlight SELL candidates (PTC, OSPN, OTEX, LULU) with their current 365d status
