@@ -9,8 +9,7 @@
 
 ## Romanian Tax Rules
 - Capital gains tax: 3% if position held >365 days, 6% if <365 days
-- Dividends/gains must be declared in "Declaratia Unica" even if broker withholds tax
-- US dividends: 15% withholding (W-8BEN reduces from 30%)
+- Use tax rates only in Individual Stocks section for buy/sell/hold recommendations
 
 ## Portfolio Structure
 
@@ -24,19 +23,17 @@ No regular investment. US market only. Growth focus, no dividends preferred.
 - HOLD/GROW: AMZN, ADBE
 
 ### 3. Romania — TradeVille, RON
-- BET ETF: €250 RON/month, hold 10–15 years
+- BET ETF: 250 RON/month, hold 10–15 years
 - Romanian Government Bonds: inflation hedge for uncommitted cash
 
-## Analysis Instructions
-Output a complete self-contained HTML report titled "portfolio-analysis-{{TODAY}}" with dark financial dashboard aesthetic and inline CSS.
+## Report Format
+Output a complete self-contained HTML report titled "portfolio-analysis-{{TODAY}}".
+Clean minimal style: white background, simple tables, green for gains, red for losses.
 
-Cover all sections concisely using tables over prose:
-1. Portfolio overview — total value in EUR, allocation breakdown
-2. ETF portfolio — holdings vs target allocation
-3. Individual stocks — each position: days held, tax rate (3%/6%), buy/sell/hold
-4. Romania portfolio — BET ETF and bonds
-5. Tax notes — positions >365 days, estimated capital gains tax impact
-6. Global news — macro events affecting the portfolio
-7. Stock-specific news — per ticker
-8. Romania news — political/economic developments
-9. Watchlist & alerts — opportunities and risks based on current news
+Sections to include:
+1. Portfolio Overview — total value in EUR, all holdings in one compact table
+2. Individual Stocks — each position: days held, tax rate, buy/sell/hold
+3. Global News — macro events affecting the portfolio
+4. Stock-Specific News — per ticker
+5. Romania News — political/economic developments
+6. Watchlist & Alerts — opportunities and risks
