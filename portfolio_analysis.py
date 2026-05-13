@@ -48,6 +48,7 @@ MACRO_KEYWORDS = [
     "Fed", "FOMC", "ECB", "BNR", "inflation", "interest rate",
     "recession", "Romania", "RON", "EUR/USD", "EUR",
     "S&P 500", "STOXX", "REIT", "bond yield", "Treasury",
+    "Bitcoin", "BTC", "crypto", "cryptocurrency", "Ethereum", "ETH",
 ]
 
 MAX_ITEMS_TOTAL = 30
@@ -59,6 +60,10 @@ RSS_FEEDS_STATIC = {
     "General Financial News": [
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/"),
         ("CNBC",        "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+    ],
+    "Crypto": [
+        ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+        ("Decrypt",  "https://decrypt.co/feed"),
     ],
     "Romania": [
         ("Profit.ro", "https://www.profit.ro/rss"),
@@ -416,23 +421,25 @@ is_full   = portfolio_changed(signature)
 
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — 6 sections only:
+    analysis_scope = """Perform a FULL analysis — 7 sections only:
 1. Portfolio Overview — total value EUR, all holdings in one compact table
 2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
 5. Romania News — from digest
-6. Watchlist & Alerts — 3-5 opportunities or risks
+6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
+7. Watchlist & Alerts — 3-5 opportunities or risks
 
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
     analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only.
-Focus on sections 3-6 in full detail:
+Focus on sections 3-7 in full detail:
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
 5. Romania News — from digest
-6. Watchlist & Alerts — 3-5 opportunities or risks
+6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
+7. Watchlist & Alerts — 3-5 opportunities or risks
 
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 
