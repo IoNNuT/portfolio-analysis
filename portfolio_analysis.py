@@ -510,6 +510,9 @@ msg["To"]      = RECIPIENT_EMAIL
 
 msg.attach(MIMEText(f"Portfolio analysis ready.\nDate: {TODAY_STR} | Mode: {mode}", "plain"))
 msg.attach(MIMEText(html_report, "html"))
+attachment = MIMEText(html_report, "html")
+attachment.add_header("Content-Disposition", "attachment", filename=os.path.basename(filename))
+msg.attach(attachment)
 
 with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
     server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
