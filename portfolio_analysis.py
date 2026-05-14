@@ -55,7 +55,7 @@ MAX_ITEMS_TOTAL = 30
 MAX_PER_FEED    = 3
 
 # ── RSS FEEDS ─────────────────────────────────────────────────────────────────
-# Only live, verified feeds. Per-ticker feeds are built at runtime from holdings.
+# Only live, verified feeds. Per-ticker feeds are built at runtime from holdings
 RSS_FEEDS_STATIC = {
     "General Financial News": [
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/"),
