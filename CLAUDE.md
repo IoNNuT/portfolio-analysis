@@ -21,6 +21,11 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `.github/workflows/portfolio_analysis.yml` | GitHub Actions cron: runs Mondays 08:00 UTC |
 | `seen_articles.db` | SQLite cache of article URLs (prevents duplicates across weekly runs) |
 
+## API Cost Target
+
+**Goal: keep Claude API cost below $0.30 per portfolio analysis run.**
+When suggesting changes that affect API usage (prompt size, number of calls, model choice), always evaluate the cost impact and prefer approaches that stay within this budget.
+
 ## How It Works
 
 1. **Fetch:** Google Sheets (CSV API) → Summary, Utilities, Tranzactii sheets
