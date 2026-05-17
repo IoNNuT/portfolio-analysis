@@ -17,6 +17,7 @@ ANTHROPIC_API_KEY  = os.environ["ANTHROPIC_API_KEY"]
 GMAIL_USER         = os.environ["GMAIL_USER"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 RECIPIENT_EMAIL    = os.environ["RECIPIENT_EMAIL"]
+DASHBOARD_URL      = os.environ.get("DASHBOARD_URL", "")
 
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%Y-%m-%d")
@@ -486,6 +487,11 @@ Style:
 - Green for positive values, red for negative
 - No external dependencies, fully self-contained
 - Mobile-friendly with max-width: 800px centered
+
+Dashboard Link:
+Add a prominent button/link at the TOP of the report: "View Interactive Dashboard"
+URL: {DASHBOARD_URL}
+Style it as a blue button or link that stands out.
 
 Analysis to render:
 {analysis_text}"""
