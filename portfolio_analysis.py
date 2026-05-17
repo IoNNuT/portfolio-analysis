@@ -14,6 +14,12 @@ from email.mime.text import MIMEText
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY  = os.environ["ANTHROPIC_API_KEY"]
+
+# API pricing per million tokens
+_MODEL_PRICES = {
+    "claude-sonnet-4-6":         {"input": 3.00, "output": 15.00},
+    "claude-haiku-4-5-20251001": {"input": 0.80, "output":  4.00},
+}
 GMAIL_USER         = os.environ["GMAIL_USER"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 RECIPIENT_EMAIL    = os.environ["RECIPIENT_EMAIL"]
@@ -119,6 +125,7 @@ def md5(text):
     return hashlib.md5(text.encode()).hexdigest()
 
 def claude_call(model, system, user, max_tokens):
+    """Returns (text, cost_usd)."""
     response = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={
@@ -136,10 +143,15 @@ def claude_call(model, system, user, max_tokens):
     )
     if response.status_code != 200:
         raise RuntimeError(f"API error {response.status_code}: {response.text}")
-    data = response.json()
+    data  = response.json()
     usage = data.get("usage", {})
-    print(f"  [{model}] input: {usage.get('input_tokens',0)}, output: {usage.get('output_tokens',0)}")
-    return "".join(b["text"] for b in data.get("content", []) if b.get("type") == "text")
+    inp   = usage.get("input_tokens", 0)
+    out   = usage.get("output_tokens", 0)
+    prices = _MODEL_PRICES.get(model, {"input": 0, "output": 0})
+    cost   = (inp * prices["input"] + out * prices["output"]) / 1_000_000
+    print(f"  [{model}] input: {inp}, output: {out}, cost: ${cost:.4f}")
+    text = "".join(b["text"] for b in data.get("content", []) if b.get("type") == "text")
+    return text, cost
 
 # ── CSV PARSING ───────────────────────────────────────────────────────────────
 def parse_csv(text):
@@ -391,6 +403,10 @@ skill_path = os.path.join(os.path.dirname(__file__), "SKILL.md")
 with open(skill_path, "r", encoding="utf-8") as f:
     SKILL_CONTENT = f.read().replace("{{TODAY}}", TODAY_STR)
 
+tax_path = os.path.join(os.path.dirname(__file__), "ROMANIAN_TAX.md")
+with open(tax_path, "r", encoding="utf-8") as f:
+    ROMANIAN_TAX_CONTENT = f.read()
+
 # ── FETCH DATA ────────────────────────────────────────────────────────────────
 print(f"[{TODAY_STR}] Fetching portfolio data...")
 summary_csv    = fetch_sheet_csv(SHEET_GIDS["Summary"],    "Summary")
@@ -445,7 +461,7 @@ Focus on sections 3-7 in full detail:
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────
-SONNET_SYSTEM = SKILL_CONTENT
+SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
 
 SONNET_USER = f"""Analyse this portfolio for {TODAY_STR}. Output plain text only — NO HTML, NO markdown.
 Use short labeled sections. Be concise, use numbers not prose.
@@ -465,7 +481,7 @@ Use short labeled sections. Be concise, use numbers not prose.
 {analysis_scope}"""
 
 print(f"[{TODAY_STR}] Step 1: Sonnet analysis...")
-analysis_text = claude_call(
+analysis_text, sonnet_cost = claude_call(
     model      = "claude-sonnet-4-6",
     system     = SONNET_SYSTEM,
     user       = SONNET_USER,
@@ -497,7 +513,7 @@ Analysis to render:
 {analysis_text}"""
 
 print(f"[{TODAY_STR}] Step 2: Haiku HTML rendering...")
-html_report = claude_call(
+html_report, haiku_cost = claude_call(
     model      = "claude-haiku-4-5-20251001",
     system     = HAIKU_SYSTEM,
     user       = HAIKU_USER,
@@ -507,6 +523,24 @@ print(f"[{TODAY_STR}] Report: {len(html_report)} chars")
 
 if not html_report.strip():
     raise RuntimeError("Empty HTML report from Haiku")
+
+total_cost = sonnet_cost + haiku_cost
+print(f"[{TODAY_STR}] Total API cost: ${total_cost:.4f}")
+
+cost_footer = f"""
+<div style="margin-top:40px;padding:12px 16px;background:#f8f8f8;border-top:1px solid #ddd;font-family:sans-serif;font-size:13px;color:#555">
+  <strong>API Cost — {TODAY_STR}</strong>
+  <table style="margin-top:6px;border-collapse:collapse">
+    <tr><td style="padding:2px 16px 2px 0">Sonnet 4.6 (analysis)</td><td style="text-align:right">${sonnet_cost:.4f}</td></tr>
+    <tr><td style="padding:2px 16px 2px 0">Haiku 4.5 (HTML render)</td><td style="text-align:right">${haiku_cost:.4f}</td></tr>
+    <tr style="font-weight:bold;border-top:1px solid #ccc"><td style="padding:4px 16px 2px 0">Total</td><td style="text-align:right">${total_cost:.4f}</td></tr>
+  </table>
+</div>"""
+
+if "</body>" in html_report:
+    html_report = html_report.replace("</body>", cost_footer + "\n</body>", 1)
+else:
+    html_report += cost_footer
 
 # ── SAVE HTML ─────────────────────────────────────────────────────────────────
 filename = os.path.join(os.path.dirname(__file__), f"portfolio-analysis-{TODAY_STR}.html")
