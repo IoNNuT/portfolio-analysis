@@ -2,7 +2,7 @@ name: Weekly Portfolio Analysis
 
 on:
   schedule:
-    - cron: "0 8 * * 1"   # Every Monday 08:00 UTC = 10:00 Bucharest (11:00 summer)
+    - cron: "0 2 * * 1"   # Every Monday 02:00 UTC = 05:00 Bucharest (summer), report ready by 08:00
   workflow_dispatch:        # Manual trigger from GitHub Actions tab
 
 jobs:
