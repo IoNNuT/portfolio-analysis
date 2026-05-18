@@ -56,6 +56,7 @@ MACRO_KEYWORDS = [
     "recession", "Romania", "RON", "EUR/USD", "EUR",
     "S&P 500", "STOXX", "REIT", "bond yield", "Treasury",
     "Bitcoin", "BTC", "crypto", "cryptocurrency", "Ethereum", "ETH",
+    "Trump", "Musk",
 ]
 
 MAX_ITEMS_TOTAL = 30
@@ -67,6 +68,11 @@ RSS_FEEDS_STATIC = {
     "General Financial News": [
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/"),
         ("CNBC",        "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+        ("NYT Business",    "https://rss.nytimes.com/services/xml/rss/nf/Business.xml"),
+        ("NYT Economy",     "https://rss.nytimes.com/services/xml/rss/nf/Economy.xml"),
+        ("NYT Technology",  "https://rss.nytimes.com/services/xml/rss/nf/Technology.xml"),
+        ("NYT US",          "https://rss.nytimes.com/services/xml/rss/nf/US.xml"),
+        ("NYT World",       "https://rss.nytimes.com/services/xml/rss/nf/World.xml"),
     ],
     "Crypto": [
         ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
