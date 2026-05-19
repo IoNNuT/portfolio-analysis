@@ -446,13 +446,14 @@ if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
     analysis_scope = """Perform a FULL analysis — 7 sections only:
 1. Portfolio Overview — total value EUR, all holdings in one compact table
-2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold
+2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
 5. Romania News — from digest
 6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 7. Watchlist & Alerts — 3-5 opportunities or risks
 
+Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency.
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
@@ -464,6 +465,7 @@ Focus on sections 3-7 in full detail:
 6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 7. Watchlist & Alerts — 3-5 opportunities or risks
 
+Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency (USD for US stocks, RON for Romanian stocks).
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────

@@ -20,7 +20,7 @@ No regular investment. US market only.
 
 **Sell triggers (apply both):**
 - Weak positions sitting at a loss with no credible near-term recovery
-- Smaller positions with meaningful profit, once held >365 days (3% tax vs 6% — sell after crossing the threshold)
+- Smaller positions with meaningful profit, once held >365 days (3% tax vs 6% — sell after crossing the threshold). This tax reason applies ONLY when the position is in profit — losing positions owe zero tax regardless of holding period.
 
 **Buy criteria:** Large, high-conviction companies with strong long-term growth potential. No dividends preferred.
 

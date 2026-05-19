@@ -105,7 +105,7 @@ Applies if total net investment income (capital gains + dividends + interest) ex
 
 ## Practical Decision Rules for Analysis
 
-1. **Hold past 365 days (XTB/TradeVille positions):** Halves the capital gains rate from 6% → 3%. Always flag positions approaching this threshold.
+1. **Hold past 365 days (XTB/TradeVille positions):** Halves the capital gains rate from 6% → 3%. **CRITICAL: This rule only applies to positions with a capital gain (profit > 0). For positions at a loss, there is zero tax regardless of holding period — the 365-day threshold is completely irrelevant and must NOT be cited as a reason to hold a losing position.**
 
 2. **Loss harvesting (XTB/TradeVille):** Not applicable — losses cannot offset gains at these brokers. Do not recommend selling losers to offset winners.
 
