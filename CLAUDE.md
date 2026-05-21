@@ -20,6 +20,7 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `SKILL.md` | Investor profile, portfolio rules, tax rules |
 | `.github/workflows/portfolio_analysis.yml` | GitHub Actions cron: runs Mondays 08:00 UTC |
 | `seen_articles.db` | SQLite cache of article URLs (prevents duplicates across weekly runs) |
+| `external_scripts/snapshots.gs` | Google Apps Script: daily portfolio snapshots to Google Sheets history tabs |
 
 ## API Cost Target
 
