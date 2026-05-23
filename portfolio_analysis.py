@@ -404,6 +404,45 @@ def portfolio_changed(signature):
     print(f"[{TODAY_STR}] Portfolio {'CHANGED' if changed else 'UNCHANGED'} since last run")
     return changed
 
+# ── INVESTMENT INCOME ─────────────────────────────────────────────────────────
+def load_income_summary():
+    """Load YTD investment income from the broker DB. Returns formatted text."""
+    try:
+        from parse_broker_csv import get_ytd_summary
+        db = os.path.join(os.path.dirname(__file__), "utils", "taxes", str(TODAY.year), "investment_income.db")
+        if not os.path.exists(db):
+            return "[Investment income DB not found — run parse_broker_csv.py first]"
+        conn = sqlite3.connect(db)
+        summary = get_ytd_summary(conn, TODAY.year)
+        conn.close()
+    except Exception as e:
+        return f"[Investment income unavailable: {e}]"
+
+    lines = [f"Investment Income YTD {summary['year']} (all brokers, all accounts):"]
+    for ccy, data in summary["by_currency"].items():
+        sections = []
+        d = data["dividends"]
+        if d["gross"]:
+            sections.append(f"Dividends: gross={d['gross']} withheld={d['tax_withheld']} net={d['net']}")
+        bonds = data["ro_gov_bonds_exempt"]["total_coupons"]
+        if bonds:
+            sections.append(f"RO Gov Bonds (tax-exempt): coupons={bonds}")
+        g = data["realized_gains"]
+        if g["gross"]:
+            sections.append(f"Realized gains: gross={g['gross']} RO-tax={g['ro_tax_paid']} net={g['net']}")
+        i = data["interest"]
+        if i["net"]:
+            if i["tax_withheld"]:
+                sections.append(f"Interest: gross={i['gross']} tax={i['tax_withheld']} net={i['net']}")
+            else:
+                sections.append(f"Interest: {i['net']}")
+        if sections:
+            lines.append(f"\n{ccy}:")
+            for s in sections:
+                lines.append(f"  {s}")
+
+    return "\n".join(lines) if len(lines) > 1 else "[No investment income recorded yet]"
+
 # ── LOAD SKILL ────────────────────────────────────────────────────────────────
 skill_path = os.path.join(os.path.dirname(__file__), "SKILL.md")
 with open(skill_path, "r", encoding="utf-8") as f:
@@ -435,6 +474,10 @@ tax_data  = build_tax_table(tranzactii_rows, tranzactii_cols, TODAY)
 tax_table = format_tax_table(tax_data)
 print(f"[{TODAY_STR}] Tax table:\n{tax_table}")
 
+print(f"[{TODAY_STR}] Loading investment income...")
+income_summary = load_income_summary()
+print(f"[{TODAY_STR}] Income summary:\n{income_summary}")
+
 print(f"[{TODAY_STR}] Fetching RSS feeds...")
 news_digest = fetch_all_news(symbols)
 
@@ -444,7 +487,7 @@ is_full   = portfolio_changed(signature)
 
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — 7 sections only:
+    analysis_scope = """Perform a FULL analysis — 8 sections only:
 1. Portfolio Overview — total value EUR, all holdings in one compact table
 2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
@@ -452,21 +495,23 @@ if is_full:
 5. Romania News — from digest
 6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 7. Watchlist & Alerts — 3-5 opportunities or risks
+8. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency.
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
     analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only.
-Focus on sections 3-7 in full detail:
+Focus on sections 3-8 in full detail:
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
 5. Romania News — from digest
 6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 7. Watchlist & Alerts — 3-5 opportunities or risks
+8. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency (USD for US stocks, RON for Romanian stocks).
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, dividend income."""
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────
 SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
@@ -482,6 +527,9 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 ### Tax brackets (pre-computed FIFO from Tranzactii — use these, do not recompute)
 {tax_table}
+
+### Investment Income YTD {TODAY.year} (all brokers, all accounts)
+{income_summary}
 
 ### News digest (titles only)
 {news_digest}
