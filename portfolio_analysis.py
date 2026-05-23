@@ -443,6 +443,79 @@ def load_income_summary():
 
     return "\n".join(lines) if len(lines) > 1 else "[No investment income recorded yet]"
 
+# ── WEEKLY PERFORMANCE COMPARISON ────────────────────────────────────────────
+def _fetch_sp500_weekly_change():
+    try:
+        now     = datetime.datetime.now(datetime.timezone.utc)
+        period2 = int(now.timestamp())
+        period1 = period2 - 14 * 86400  # 14 days back → ~10 trading days
+        url = (f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC"
+               f"?interval=1d&period1={period1}&period2={period2}")
+        r = requests.get(url, headers=FEED_HEADERS, timeout=15)
+        if r.status_code != 200:
+            return None
+        closes = [c for c in r.json()["chart"]["result"][0]["indicators"]["quote"][0]["close"] if c is not None]
+        if len(closes) < 2:
+            return None
+        idx = max(0, len(closes) - 6)  # ~5 trading days ago
+        return (closes[-1] / closes[idx] - 1) * 100
+    except Exception as e:
+        print(f"[{TODAY_STR}] Warning: S&P 500 weekly fetch failed: {e}")
+        return None
+
+def _fetch_history_weekly_change(sheet_name):
+    try:
+        url = (f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
+               f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(sheet_name)}")
+        r = requests.get(url, timeout=15)
+        if r.status_code != 200:
+            return None
+        reader   = csv.reader(io.StringIO(r.text))
+        all_rows = list(reader)
+        if len(all_rows) < 3:
+            return None
+        mv_rows = []
+        for row in all_rows[1:]:  # skip header
+            if len(row) < 2:
+                continue
+            d      = parse_date(row[0].strip())
+            mv_str = row[1].replace(",", "").replace("€", "").strip()
+            if d and mv_str:
+                try:
+                    mv_rows.append((d, float(mv_str)))
+                except ValueError:
+                    pass
+        if len(mv_rows) < 2:
+            return None
+        current_mv = mv_rows[-1][1]
+        week_ago   = TODAY - datetime.timedelta(days=7)
+        past_mv    = next((mv for d, mv in reversed(mv_rows) if d <= week_ago), None)
+        if past_mv is None:
+            return None
+        return (current_mv / past_mv - 1) * 100
+    except Exception as e:
+        print(f"[{TODAY_STR}] Warning: {sheet_name} weekly fetch failed: {e}")
+        return None
+
+def fetch_weekly_comparison():
+    sp500_pct  = _fetch_sp500_weekly_change()
+    etf_pct    = _fetch_history_weekly_change("ETF History")
+    stocks_pct = _fetch_history_weekly_change("Stocks History")
+    if sp500_pct is None and etf_pct is None and stocks_pct is None:
+        return "[Weekly comparison unavailable]"
+    lines = ["Past 7 days vs S&P 500:"]
+    if sp500_pct is not None:
+        lines.append(f"  S&P 500:          {sp500_pct:+.2f}%")
+    if etf_pct is not None:
+        delta = etf_pct - sp500_pct if sp500_pct is not None else None
+        delta_str = f"  (delta {delta:+.2f}%)" if delta is not None else ""
+        lines.append(f"  ETF Portfolio:    {etf_pct:+.2f}%{delta_str}")
+    if stocks_pct is not None:
+        delta = stocks_pct - sp500_pct if sp500_pct is not None else None
+        delta_str = f"  (delta {delta:+.2f}%)" if delta is not None else ""
+        lines.append(f"  Stocks Portfolio: {stocks_pct:+.2f}%{delta_str}")
+    return "\n".join(lines)
+
 # ── LOAD SKILL ────────────────────────────────────────────────────────────────
 skill_path = os.path.join(os.path.dirname(__file__), "SKILL.md")
 with open(skill_path, "r", encoding="utf-8") as f:
@@ -481,6 +554,10 @@ print(f"[{TODAY_STR}] Income summary:\n{income_summary}")
 print(f"[{TODAY_STR}] Fetching RSS feeds...")
 news_digest = fetch_all_news(symbols)
 
+print(f"[{TODAY_STR}] Fetching weekly comparison...")
+weekly_comparison = fetch_weekly_comparison()
+print(f"[{TODAY_STR}] Weekly comparison:\n{weekly_comparison}")
+
 # Hash on positional columns only — won't drift with daily price/FX moves
 signature = portfolio_signature(summary_rows, summary_cols)
 is_full   = portfolio_changed(signature)
@@ -488,7 +565,7 @@ is_full   = portfolio_changed(signature)
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
     analysis_scope = """Perform a FULL analysis — 8 sections only:
-1. Portfolio Overview — total value EUR, all holdings in one compact table
+1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison from the data provided (1 line).
 2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
@@ -501,7 +578,7 @@ Currency rule: Use EUR only for portfolio-level totals and cross-portfolio compa
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
-    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only.
+    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only. Section 1 must include the weekly ETF vs S&P 500 comparison from the data provided.
 Focus on sections 3-8 in full detail:
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
@@ -530,6 +607,9 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 ### Investment Income YTD {TODAY.year} (all brokers, all accounts)
 {income_summary}
+
+### Weekly Performance vs S&P 500
+{weekly_comparison}
 
 ### News digest (titles only)
 {news_digest}
