@@ -2,6 +2,7 @@
 // CONFIG — column header names used in your tables
 // Only change these if you rename the columns.
 // ─────────────────────────────────────────────
+//test
 const CONFIG = {
   MV_HEADER:       "MV",
   INVESTED_HEADER: "Invested",
@@ -153,7 +154,9 @@ function recordPortfolioSnapshot_v1() {
   let sheet = ss.getSheetByName("ETF History");
   if (!sheet) sheet = ss.insertSheet("ETF History");
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["Date", "Total MV (€)", "Invested (€)", "P&L (€)", "P&L (%)"]);
+    sheet.appendRow(["Date", "Total MV (€)", "Invested (€)", "P&L (€)", "P&L (%)", "S&P 500"]);
+  } else if (!sheet.getRange(1, 6).getValue()) {
+    sheet.getRange(1, 6).setValue("S&P 500");
   }
 
   const today  = new Date(); today.setHours(0, 0, 0, 0);
@@ -167,7 +170,8 @@ function recordPortfolioSnapshot_v1() {
     if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) return;
   }
 
-  sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct]);
+  const sp500Price = fetchCurrentSP500Price();
+  sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct, sp500Price]);
 }
 
 function recordStocksSnapshot_v1() {
@@ -182,7 +186,9 @@ function recordStocksSnapshot_v1() {
   let sheet = ss.getSheetByName("Stocks History");
   if (!sheet) sheet = ss.insertSheet("Stocks History");
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["Date", "Total MV (€)", "Invested (€)", "P&L (€)", "P&L (%)"]);
+    sheet.appendRow(["Date", "Total MV (€)", "Invested (€)", "P&L (€)", "P&L (%)", "S&P 500"]);
+  } else if (!sheet.getRange(1, 6).getValue()) {
+    sheet.getRange(1, 6).setValue("S&P 500");
   }
 
   const today  = new Date(); today.setHours(0, 0, 0, 0);
@@ -196,7 +202,8 @@ function recordStocksSnapshot_v1() {
     if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) return;
   }
 
-  sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct]);
+  const sp500Price = fetchCurrentSP500Price();
+  sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct, sp500Price]);
 }
 
 function recordNetWorthSnapshot() {
@@ -287,4 +294,114 @@ function recordNetWorthSnapshot() {
   if (totalLiabilities !== null) row.push(totalLiabilities);
 
   histSheet.appendRow(row);
+}
+
+// ─────────────────────────────────────────────
+// S&P 500 helpers
+// ─────────────────────────────────────────────
+
+function _fetchSP500PriceMap_(fromDate, toDate) {
+  const period1 = Math.floor(fromDate.getTime() / 1000) - 86400;
+  const period2 = Math.floor(toDate.getTime()   / 1000) + 86400;
+  const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&period1=" + period1 + "&period2=" + period2;
+  const resp = UrlFetchApp.fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS/1.0)" },
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() !== 200) {
+    throw new Error("Yahoo Finance HTTP " + resp.getResponseCode());
+  }
+  const result = JSON.parse(resp.getContentText());
+  const chart  = result.chart.result[0];
+  const ts     = chart.timestamp;
+  const closes = chart.indicators.quote[0].close;
+  const map    = new Map();
+  ts.forEach(function(t, i) {
+    if (closes[i] == null) return;
+    // NYSE opens at 14:30 UTC — timestamp falls on the same UTC calendar day as the trading date
+    map.set(new Date(t * 1000).toISOString().split("T")[0], closes[i]);
+  });
+  return map;
+}
+
+function _lookupSP500_(priceMap, dateStr) {
+  if (priceMap.has(dateStr)) return priceMap.get(dateStr);
+  // Fall back to last available trading day (weekends / holidays)
+  const d = new Date(dateStr + "T12:00:00Z");
+  for (let i = 1; i <= 5; i++) {
+    d.setUTCDate(d.getUTCDate() - 1);
+    const prev = d.toISOString().split("T")[0];
+    if (priceMap.has(prev)) return priceMap.get(prev);
+  }
+  return null;
+}
+
+function fetchCurrentSP500Price() {
+  try {
+    const now  = new Date();
+    const from = new Date(now.getTime() - 7 * 86400 * 1000);
+    const map  = _fetchSP500PriceMap_(from, now);
+    if (map.size === 0) return null;
+    const sorted = Array.from(map.entries()).sort(function(a, b) { return a[0] > b[0] ? -1 : 1; });
+    return sorted[0][1];
+  } catch (e) {
+    Logger.log("fetchCurrentSP500Price error: " + e);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────
+// One-time backfill: adds "S&P 500" column to all
+// existing rows in ETF History and Stocks History.
+// Run once manually from the Apps Script editor.
+// ─────────────────────────────────────────────
+function backfillSP500() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ["ETF History", "Stocks History"].forEach(function(name) { _backfillSheet_(ss, name); });
+}
+
+function _backfillSheet_(ss, sheetName) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) { Logger.log("_backfillSheet_: \"" + sheetName + "\" not found"); return; }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log("_backfillSheet_: \"" + sheetName + "\" has no data rows"); return; }
+
+  if (!sheet.getRange(1, 6).getValue()) sheet.getRange(1, 6).setValue("S&P 500");
+
+  const dateVals  = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const sp500Vals = sheet.getRange(2, 6, lastRow - 1, 1).getValues();
+
+  // Determine date range of rows that still need filling
+  let minDate = null, maxDate = null;
+  dateVals.forEach(function(row, i) {
+    if (sp500Vals[i][0] !== "" && sp500Vals[i][0] !== null) return;
+    const d = new Date(row[0]); d.setHours(0, 0, 0, 0);
+    if (!minDate || d < minDate) minDate = new Date(d);
+    if (!maxDate || d > maxDate) maxDate = new Date(d);
+  });
+
+  if (!minDate) { Logger.log("_backfillSheet_: \"" + sheetName + "\" already fully backfilled"); return; }
+
+  Logger.log("_backfillSheet_: fetching S&P 500 for \"" + sheetName + "\" " +
+    minDate.toISOString().split("T")[0] + " → " + maxDate.toISOString().split("T")[0]);
+
+  const priceMap = _fetchSP500PriceMap_(minDate, maxDate);
+  Logger.log("_backfillSheet_: " + priceMap.size + " trading days retrieved");
+
+  let filled = 0, missing = 0;
+  for (let i = 0; i < dateVals.length; i++) {
+    if (sp500Vals[i][0] !== "" && sp500Vals[i][0] !== null) continue;
+    const d = new Date(dateVals[i][0]);
+    // Use local date (matches how Sheets stores dates in the spreadsheet timezone)
+    const dateStr = d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+    const price = _lookupSP500_(priceMap, dateStr);
+    if (price !== null) { sp500Vals[i][0] = price; filled++; }
+    else { missing++; Logger.log("_backfillSheet_: no price found for " + dateStr); }
+  }
+
+  sheet.getRange(2, 6, lastRow - 1, 1).setValues(sp500Vals);
+  Logger.log("_backfillSheet_: \"" + sheetName + "\" done — filled=" + filled + " missing=" + missing);
 }

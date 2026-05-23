@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0d0f14;
+    --surface: #13161e;
+    --border:  #1e2330;
+    --blue:    #4f8ef7;
+    --purple:  #a78bfa;
+    --green:   #2dd4a0;
+    --red:     #f7605a;
+    --muted:   #4a5068;
+    --text:    #e8eaf2;
+    --subtext: #7c82a0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 32px;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 span { color: var(--blue); }
+
+  .updated {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+
+  .tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .stats-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    margin-top: 24px;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stats.three { grid-template-columns: repeat(3, 1fr); }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--subtext);
+    margin-bottom: 8px;
+  }
+
+  .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .stat-value.positive { color: var(--green); }
+  .stat-value.negative { color: var(--red); }
+  .stat-value.neutral  { color: var(--text); }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    margin-top: 24px;
+  }
+
+  .chart-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--subtext);
+  }
+
+  .range-btns { display: flex; gap: 6px; }
+
+  .range-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--subtext);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  .range-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .range-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  .hint {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  canvas { display: block; }
+
+  @media (max-width: 600px) {
+    body { padding: 16px; }
+    .stats, .stats.three { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Portfolio <span>Dashboard</span></h1>
+  <div class="updated" id="updated">—</div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('etf', this)">ETF</button>
+  <button class="tab" onclick="switchTab('stocks', this)">Stocks</button>
+  <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
+</div>
+
+<!-- ETF PANEL -->
+<div class="panel active" id="panel-etf">
+  <div class="stats-label">LATEST SNAPSHOT</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="etf-mv">—</div></div>
+    <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="etf-inv">—</div></div>
+    <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="etf-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">Return</div><div class="stat-value" id="etf-pct">—</div></div>
+  </div>
+  <div class="stats-label">PERIOD PERFORMANCE</div>
+  <div class="stats three">
+    <div class="stat"><div class="stat-label">P&amp;L Change</div><div class="stat-value" id="etf-period-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="etf-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="etf-period-range" style="font-size:13px">—</div></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-toolbar">
+      <div class="chart-title">Market Value vs Invested</div>
+      <div class="range-btns" id="etf-range-btns">
+        <button class="range-btn" onclick="setRange('etf', 1, this)">1D</button>
+        <button class="range-btn" onclick="setRange('etf', 7, this)">1W</button>
+        <button class="range-btn" onclick="setRange('etf', 30, this)">1M</button>
+        <button class="range-btn" onclick="setRange('etf', 90, this)">3M</button>
+        <button class="range-btn" onclick="setRange('etf', 180, this)">6M</button>
+        <button class="range-btn" onclick="setRange('etf', 365, this)">1Y</button>
+        <button class="range-btn active" onclick="setRange('etf', null, this)">ALL</button>
+      </div>
+    </div>
+    <div id="etf-loading" class="loading">LOADING DATA...</div>
+    <canvas id="etf-chart" style="display:none"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-toolbar">
+      <div class="chart-title">Portfolio vs S&P 500 — Normalized Return</div>
+    </div>
+    <div id="etf-cmp-loading" class="loading">LOADING DATA...</div>
+    <canvas id="etf-cmp-chart" style="display:none"></canvas>
+  </div>
+</div>
+
+<!-- STOCKS PANEL -->
+<div class="panel" id="panel-stocks">
+  <div class="stats-label">LATEST SNAPSHOT</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="stocks-mv">—</div></div>
+    <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="stocks-inv">—</div></div>
+    <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="stocks-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">Return</div><div class="stat-value" id="stocks-pct">—</div></div>
+  </div>
+  <div class="stats-label">PERIOD PERFORMANCE</div>
+  <div class="stats three">
+    <div class="stat"><div class="stat-label">P&amp;L Change</div><div class="stat-value" id="stocks-period-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="stocks-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="stocks-period-range" style="font-size:13px">—</div></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-toolbar">
+      <div class="chart-title">Market Value vs Invested</div>
+      <div class="range-btns">
+        <button class="range-btn" onclick="setRange('stocks', 1, this)">1D</button>
+        <button class="range-btn" onclick="setRange('stocks', 7, this)">1W</button>
+        <button class="range-btn" onclick="setRange('stocks', 30, this)">1M</button>
+        <button class="range-btn" onclick="setRange('stocks', 90, this)">3M</button>
+        <button class="range-btn" onclick="setRange('stocks', 180, this)">6M</button>
+        <button class="range-btn" onclick="setRange('stocks', 365, this)">1Y</button>
+        <button class="range-btn active" onclick="setRange('stocks', null, this)">ALL</button>
+      </div>
+    </div>
+    <div id="stocks-loading" class="loading">LOADING DATA...</div>
+    <canvas id="stocks-chart" style="display:none"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-toolbar">
+      <div class="chart-title">Portfolio vs S&P 500 — Normalized Return</div>
+    </div>
+    <div id="stocks-cmp-loading" class="loading">LOADING DATA...</div>
+    <canvas id="stocks-cmp-chart" style="display:none"></canvas>
+  </div>
+</div>
+
+<!-- NET WORTH PANEL -->
+<div class="panel" id="panel-networth">
+  <div class="stats-label">LATEST SNAPSHOT</div>
+  <div class="stats three">
+    <div class="stat"><div class="stat-label">Net Worth</div><div class="stat-value neutral" id="nw-value">—</div></div>
+    <div class="stat"><div class="stat-label">Period Change</div><div class="stat-value" id="nw-period-change">—</div></div>
+    <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="nw-period-range" style="font-size:13px">—</div></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-toolbar">
+      <div class="chart-title">Net Worth Over Time</div>
+      <div class="range-btns">
+        <button class="range-btn" onclick="setRange('nw', 1, this)">1D</button>
+        <button class="range-btn" onclick="setRange('nw', 7, this)">1W</button>
+        <button class="range-btn" onclick="setRange('nw', 30, this)">1M</button>
+        <button class="range-btn" onclick="setRange('nw', 90, this)">3M</button>
+        <button class="range-btn" onclick="setRange('nw', 180, this)">6M</button>
+        <button class="range-btn" onclick="setRange('nw', 365, this)">1Y</button>
+        <button class="range-btn active" onclick="setRange('nw', null, this)">ALL</button>
+      </div>
+    </div>
+    <div id="nw-loading" class="loading">LOADING DATA...</div>
+    <canvas id="nw-chart" style="display:none"></canvas>
+  </div>
+</div>
+
+<div class="hint">SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
+
+<script>
+  let data = { etf: [], stocks: [], nw: [] };
+  let charts = { etf: null, stocks: null, nw: null };
+  let compCharts = { etf: null, stocks: null };
+  let loaded = { etf: false, stocks: false, nw: false };
+
+  const fmt  = v => '€' + v.toLocaleString('en-IE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtp = v => (v * 100).toFixed(2) + '%';
+  const sign = v => v >= 0 ? '+' : '';
+  const cls  = v => v >= 0 ? 'positive' : 'negative';
+
+  function switchTab(tab, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + tab).classList.add('active');
+  }
+
+  function updateLatestStats(type, rows) {
+    const last = rows[rows.length - 1];
+    if (type === 'nw') {
+      document.getElementById('nw-value').textContent = fmt(last.netWorth);
+      document.getElementById('updated').textContent  = 'LAST UPDATE ' + last.date;
+      return;
+    }
+    document.getElementById(type + '-mv').textContent  = fmt(last.mv);
+    document.getElementById(type + '-inv').textContent = fmt(last.invested);
+    const pnlEl = document.getElementById(type + '-pnl');
+    pnlEl.textContent = sign(last.pnl) + fmt(last.pnl);
+    pnlEl.className = 'stat-value ' + cls(last.pnl);
+    const pctEl = document.getElementById(type + '-pct');
+    pctEl.textContent = sign(last.pnlPct) + fmtp(last.pnlPct);
+    pctEl.className = 'stat-value ' + cls(last.pnlPct);
+    document.getElementById('updated').textContent = 'LAST UPDATE ' + last.date;
+  }
+
+  function updatePeriodStats(type, rows) {
+    if (rows.length < 2) return;
+    const first = rows[0];
+    const last  = rows[rows.length - 1];
+
+    if (type === 'nw') {
+      const change = last.netWorth - first.netWorth;
+      const el = document.getElementById('nw-period-change');
+      el.textContent = sign(change) + fmt(change);
+      el.className = 'stat-value ' + cls(change);
+      document.getElementById('nw-period-range').textContent = first.date + ' → ' + last.date;
+      return;
+    }
+
+    const pnlChange = last.pnl - first.pnl;
+    const pctChange = last.pnlPct - first.pnlPct;
+
+    const pnlEl = document.getElementById(type + '-period-pnl');
+    pnlEl.textContent = sign(pnlChange) + fmt(pnlChange);
+    pnlEl.className = 'stat-value ' + cls(pnlChange);
+
+    const pctEl = document.getElementById(type + '-period-pct');
+    pctEl.textContent = sign(pctChange) + fmtp(pctChange);
+    pctEl.className = 'stat-value ' + cls(pctChange);
+
+    document.getElementById(type + '-period-range').textContent = first.date + ' → ' + last.date;
+  }
+
+  function buildChart(type, rows) {
+    const canvasId = type + '-chart';
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts[type]) charts[type].destroy();
+
+    const labels = rows.map(d => d.date);
+
+    const blueGrad = ctx.createLinearGradient(0, 0, 0, 400);
+    blueGrad.addColorStop(0, 'rgba(79,142,247,0.25)');
+    blueGrad.addColorStop(1, 'rgba(79,142,247,0)');
+
+    const purpleGrad = ctx.createLinearGradient(0, 0, 0, 400);
+    purpleGrad.addColorStop(0, 'rgba(167,139,250,0.25)');
+    purpleGrad.addColorStop(1, 'rgba(167,139,250,0)');
+
+    let datasets;
+    if (type === 'nw') {
+      datasets = [{
+        label: 'Net Worth (€)',
+        data: rows.map(d => d.netWorth),
+        borderColor: '#a78bfa',
+        backgroundColor: purpleGrad,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: '#a78bfa',
+        fill: true,
+        tension: 0.3
+      }];
+    } else {
+      datasets = [
+        {
+          label: 'Market Value (€)',
+          data: rows.map(d => d.mv),
+          borderColor: '#4f8ef7',
+          backgroundColor: blueGrad,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: '#4f8ef7',
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'Invested (€)',
+          data: rows.map(d => d.invested),
+          borderColor: '#4a5068',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: false,
+          tension: 0.1
+        }
+      ];
+    }
+
+    charts[type] = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: '#7c82a0',
+              font: { family: 'DM Mono', size: 11 },
+              boxWidth: 20,
+              padding: 20
+            }
+          },
+          tooltip: {
+            backgroundColor: '#1e2330',
+            titleColor: '#7c82a0',
+            bodyColor: '#e8eaf2',
+            borderColor: '#2a3045',
+            borderWidth: 1,
+            titleFont: { family: 'DM Mono', size: 11 },
+            bodyFont: { family: 'DM Mono', size: 12 },
+            padding: 12,
+            callbacks: {
+              label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y)
+            }
+          },
+          zoom: {
+            pan:  { enabled: true, mode: 'x' },
+            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#4a5068', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+            grid: { color: 'transparent' },
+            border: { color: '#1e2330' }
+          },
+          y: {
+            ticks: {
+              color: '#4a5068',
+              font: { family: 'DM Mono', size: 10 },
+              callback: v => '€' + v.toLocaleString('en-IE', { maximumFractionDigits: 0 })
+            },
+            grid: { color: '#1a1e2a' },
+            border: { color: 'transparent' }
+          }
+        }
+      }
+    });
+  }
+
+  function buildComparisonChart(type, rows) {
+    const loadingId = type + '-cmp-loading';
+    const canvasId  = type + '-cmp-chart';
+    const validRows = rows.filter(d => d.sp500 !== null && d.sp500 > 0 && d.mv > 0);
+
+    if (validRows.length < 2) {
+      document.getElementById(loadingId).textContent = 'NO S&P 500 DATA — RUN BACKFILL FIRST';
+      document.getElementById(loadingId).style.display = 'flex';
+      document.getElementById(canvasId).style.display = 'none';
+      return;
+    }
+
+    document.getElementById(loadingId).style.display = 'none';
+    document.getElementById(canvasId).style.display = 'block';
+
+    const baseMV    = validRows[0].mv;
+    const baseSP500 = validRows[0].sp500;
+    const labels    = validRows.map(d => d.date);
+    const portRet   = validRows.map(d => (d.mv    / baseMV    - 1) * 100);
+    const sp500Ret  = validRows.map(d => (d.sp500 / baseSP500 - 1) * 100);
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (compCharts[type]) compCharts[type].destroy();
+
+    compCharts[type] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'My Portfolio',
+            data: portRet,
+            borderColor: '#4f8ef7',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            tension: 0.3
+          },
+          {
+            label: 'S&P 500',
+            data: sp500Ret,
+            borderColor: '#f7a24f',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#7c82a0', font: { family: 'DM Mono', size: 11 }, boxWidth: 20, padding: 20 }
+          },
+          tooltip: {
+            backgroundColor: '#1e2330',
+            titleColor: '#7c82a0',
+            bodyColor: '#e8eaf2',
+            borderColor: '#2a3045',
+            borderWidth: 1,
+            titleFont: { family: 'DM Mono', size: 11 },
+            bodyFont: { family: 'DM Mono', size: 12 },
+            padding: 12,
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                return ' ' + ctx.dataset.label + ': ' + (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+              }
+            }
+          },
+          zoom: {
+            pan:  { enabled: true, mode: 'x' },
+            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#4a5068', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+            grid:  { color: 'transparent' },
+            border: { color: '#1e2330' }
+          },
+          y: {
+            ticks: {
+              color: '#4a5068',
+              font: { family: 'DM Mono', size: 10 },
+              callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
+            },
+            grid:  { color: '#1a1e2a' },
+            border: { color: 'transparent' }
+          }
+        }
+      }
+    });
+  }
+
+  function setRange(type, days, btn) {
+    const parent = btn.closest('.range-btns');
+    parent.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const all = data[type];
+
+    if (!days) {
+      buildChart(type, all);
+      updatePeriodStats(type, all);
+      if (type !== 'nw') buildComparisonChart(type, all);
+      return;
+    }
+
+    if (days === 1) {
+      const slice = all.slice(-2);
+      const d = slice.length > 1 ? slice : all;
+      buildChart(type, d);
+      updatePeriodStats(type, d);
+      if (type !== 'nw') buildComparisonChart(type, d);
+      return;
+    }
+
+    const lastDate = new Date(all[all.length - 1].date);
+    const cutoff   = new Date(lastDate);
+    cutoff.setDate(cutoff.getDate() - days);
+    const filtered = all.filter(d => new Date(d.date) >= cutoff);
+    const d = filtered.length > 1 ? filtered : all;
+    buildChart(type, d);
+    updatePeriodStats(type, d);
+    if (type !== 'nw') buildComparisonChart(type, d);
+  }
+
+  function initPanel(type, rows) {
+    const loadingId = type + '-loading';
+    const canvasId  = type + '-chart';
+    data[type] = rows;
+    document.getElementById(loadingId).style.display = 'none';
+    document.getElementById(canvasId).style.display = 'block';
+    updateLatestStats(type, rows);
+    updatePeriodStats(type, rows);
+    buildChart(type, rows);
+    if (type !== 'nw') buildComparisonChart(type, rows);
+  }
+
+  // Load all three in parallel
+  google.script.run.withSuccessHandler(rows => initPanel('etf', rows))
+    .withFailureHandler(e => document.getElementById('etf-loading').textContent = 'ERROR: ' + e.message)
+    .getChartData();
+
+  google.script.run.withSuccessHandler(rows => initPanel('stocks', rows))
+    .withFailureHandler(e => document.getElementById('stocks-loading').textContent = 'ERROR: ' + e.message)
+    .getStocksData();
+
+  google.script.run.withSuccessHandler(rows => initPanel('nw', rows))
+    .withFailureHandler(e => document.getElementById('nw-loading').textContent = 'ERROR: ' + e.message)
+    .getNetWorthData();
+</script>
+</body>
+</html>
