@@ -190,7 +190,14 @@
 
   @media (max-width: 600px) {
     body { padding: 16px; }
+    h1 { font-size: 22px; }
     .stats, .stats.three { grid-template-columns: repeat(2, 1fr); }
+    .stat-value { font-size: 17px; }
+    .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+    .tab { white-space: nowrap; padding: 10px 14px; }
+    .chart-toolbar { flex-direction: column; align-items: flex-start; }
+    .range-btns { flex-wrap: wrap; }
+    .chart-card { padding: 16px; }
   }
 </style>
 </head>
@@ -314,7 +321,7 @@
   </div>
 </div>
 
-<div class="hint">SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
+<div class="hint">CTRL+SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
 
 <script>
   let data = { etf: [], stocks: [], nw: [] };
@@ -468,7 +475,7 @@
           },
           zoom: {
             pan:  { enabled: true, mode: 'x' },
-            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+            zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
           }
         },
         scales: {
@@ -584,7 +591,7 @@
           },
           zoom: {
             pan:  { enabled: true, mode: 'x' },
-            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+            zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
           }
         },
         scales: {
