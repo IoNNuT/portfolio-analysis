@@ -491,6 +491,23 @@
     });
   }
 
+  // Time-Weighted Return: chains sub-period returns, stripping out cash flows
+  // detected as day-over-day changes in the invested column.
+  function computeTWR(rows) {
+    const result = [0];
+    let cumulative = 1.0;
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const curr = rows[i];
+      const cf    = (curr.invested || 0) - (prev.invested || 0);
+      const denom = prev.mv + cf;
+      const r     = denom > 0 ? (curr.mv - prev.mv - cf) / denom : 0;
+      cumulative *= (1 + r);
+      result.push((cumulative - 1) * 100);
+    }
+    return result;
+  }
+
   function buildComparisonChart(type, rows) {
     const loadingId = type + '-cmp-loading';
     const canvasId  = type + '-cmp-chart';
@@ -506,10 +523,9 @@
     document.getElementById(loadingId).style.display = 'none';
     document.getElementById(canvasId).style.display = 'block';
 
-    const baseMV    = validRows[0].mv;
     const baseSP500 = validRows[0].sp500;
     const labels    = validRows.map(d => d.date);
-    const portRet   = validRows.map(d => (d.mv    / baseMV    - 1) * 100);
+    const portRet   = computeTWR(validRows);
     const sp500Ret  = validRows.map(d => (d.sp500 / baseSP500 - 1) * 100);
 
     const ctx = document.getElementById(canvasId).getContext('2d');

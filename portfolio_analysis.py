@@ -464,43 +464,93 @@ def _fetch_sp500_weekly_change():
         return None
 
 def _fetch_history_weekly_change(sheet_name):
+    """Returns (portfolio_pct, sp500_pct) using Modified Dietz to strip out cash flows."""
     try:
         url = (f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
                f"/gviz/tq?tqx=out:csv&sheet={requests.utils.quote(sheet_name)}")
         r = requests.get(url, timeout=15)
         if r.status_code != 200:
-            return None
+            return None, None
         reader   = csv.reader(io.StringIO(r.text))
         all_rows = list(reader)
         if len(all_rows) < 3:
-            return None
-        mv_rows = []
+            return None, None
+
+        def parse_num(s):
+            s = s.replace(",", "").replace("€", "").replace("$", "").strip()
+            try:
+                return float(s) if s else None
+            except ValueError:
+                return None
+
+        rows = []
         for row in all_rows[1:]:  # skip header
             if len(row) < 2:
                 continue
-            d      = parse_date(row[0].strip())
-            mv_str = row[1].replace(",", "").replace("€", "").strip()
-            if d and mv_str:
-                try:
-                    mv_rows.append((d, float(mv_str)))
-                except ValueError:
-                    pass
-        if len(mv_rows) < 2:
-            return None
-        current_mv = mv_rows[-1][1]
-        week_ago   = TODAY - datetime.timedelta(days=7)
-        past_mv    = next((mv for d, mv in reversed(mv_rows) if d <= week_ago), None)
-        if past_mv is None:
-            return None
-        return (current_mv / past_mv - 1) * 100
+            d = parse_date(row[0].strip())
+            if not d:
+                continue
+            mv       = parse_num(row[1]) if len(row) > 1 else None
+            invested = parse_num(row[2]) if len(row) > 2 else None
+            sp500    = parse_num(row[5]) if len(row) > 5 else None
+            if mv is not None:
+                rows.append((d, mv, invested, sp500))
+
+        if len(rows) < 2:
+            return None, None
+
+        week_ago  = TODAY - datetime.timedelta(days=7)
+        start_row = next((row for row in reversed(rows) if row[0] <= week_ago), None)
+        if start_row is None:
+            return None, None
+        end_row = rows[-1]
+
+        # S&P 500 weekly return read directly from the sheet
+        sp500_start = start_row[3]
+        sp500_end   = end_row[3]
+        sp500_pct = (sp500_end / sp500_start - 1) * 100 if sp500_start and sp500_end else None
+
+        # Modified Dietz: removes the effect of cash injections/withdrawals.
+        # CF detected as day-over-day change in the Invested column.
+        v_start    = start_row[1]
+        v_end      = end_row[1]
+        start_date = start_row[0]
+        end_date   = end_row[0]
+        D = max((end_date - start_date).days, 1)
+
+        in_window     = [row for row in rows if start_date < row[0] <= end_date]
+        cf_sum        = 0.0
+        weighted_cf   = 0.0
+        prev_invested = start_row[2]
+        for row in in_window:
+            curr_invested = row[2]
+            if curr_invested is not None and prev_invested is not None:
+                cf = curr_invested - prev_invested
+                if abs(cf) > 0.01:
+                    d_i = (row[0] - start_date).days
+                    w_i = (D - d_i) / D
+                    cf_sum      += cf
+                    weighted_cf += w_i * cf
+            if curr_invested is not None:
+                prev_invested = curr_invested
+
+        denominator = v_start + weighted_cf
+        if denominator <= 0:
+            return None, sp500_pct
+        portfolio_pct = (v_end - v_start - cf_sum) / denominator * 100
+
+        return portfolio_pct, sp500_pct
+
     except Exception as e:
         print(f"[{TODAY_STR}] Warning: {sheet_name} weekly fetch failed: {e}")
-        return None
+        return None, None
 
 def fetch_weekly_comparison():
-    sp500_pct  = _fetch_sp500_weekly_change()
-    etf_pct    = _fetch_history_weekly_change("ETF History")
-    stocks_pct = _fetch_history_weekly_change("Stocks History")
+    etf_pct,    sp500_from_etf    = _fetch_history_weekly_change("ETF History")
+    stocks_pct, sp500_from_stocks = _fetch_history_weekly_change("Stocks History")
+    sp500_pct = sp500_from_etf or sp500_from_stocks
+    if sp500_pct is None:
+        sp500_pct = _fetch_sp500_weekly_change()  # fallback to Yahoo Finance
     if sp500_pct is None and etf_pct is None and stocks_pct is None:
         return "[Weekly comparison unavailable]"
     lines = ["Past 7 days vs S&P 500:"]
