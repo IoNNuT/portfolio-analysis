@@ -2,32 +2,39 @@
 
 Goal: push local changes to Google Apps Script directly instead of copy-pasting.
 
-## One-time setup
+**Status:** Setup complete. All Apps Script files live in `clasp/` and are linked to the remote project via `clasp/.clasp.json`.
+
+## One-time setup (already done)
 
 ```bash
 npm install -g @google/clasp
 clasp login   # opens browser for Google auth
 ```
 
-Link to the existing Apps Script project from the external_scripts/ directory:
-
-```bash
-cd external_scripts/
-clasp clone <your-script-id>   # creates .clasp.json + pulls current remote files
-```
-
-Get the script ID from the Apps Script editor URL:
-`https://script.google.com/d/<SCRIPT_ID>/edit`
+The `clasp/` directory is already cloned and linked. The script ID in `clasp/.clasp.json` points to the live Google Apps Script project.
 
 ## Daily workflow
 
 ```bash
-clasp push   # upload local .gs files to Apps Script
+cd clasp/
+clasp push   # upload local files to Apps Script
 clasp pull   # download remote changes to local
 ```
 
-## Caveats before first run
+## Files in clasp/
 
-- Back up the current snapshots.gs before running `clasp clone`
-- `clasp clone` pulls remote files and generates an appsscript.json manifest — reconcile any differences with the local version
-- After cloning, `clasp push` will overwrite the remote with whatever is in external_scripts/
+| File | Purpose |
+|------|---------|
+| `automation.js` | Daily snapshot recording (ETF, Stocks, NetWorth) |
+| `chart.js` | Server-side data functions for the web dashboard |
+| `chart_page.html` | Interactive dashboard frontend |
+| `Code.js` | Entry-point / utility functions |
+| `debug.js` | Debug helpers |
+| `appsscript.json` | Apps Script manifest |
+| `.clasp.json` | Links local dir to remote script project |
+
+## Notes
+
+- After pushing `.gs`/`.js` files, deploy a **new Web App version** in the Apps Script editor to bust Google's cache
+- HTML file changes are picked up on browser reload without redeployment
+- `clasp push` overwrites the remote with local files — always pull before editing if remote changes were made in the browser

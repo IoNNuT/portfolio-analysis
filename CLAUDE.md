@@ -20,7 +20,12 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `SKILL.md` | Investor profile, portfolio rules, tax rules |
 | `.github/workflows/portfolio_analysis.yml` | GitHub Actions cron: runs Mondays 08:00 UTC |
 | `seen_articles.db` | SQLite cache of article URLs (prevents duplicates across weekly runs) |
-| `external_scripts/snapshots.gs` | Google Apps Script: daily portfolio snapshots to Google Sheets history tabs |
+| `parse_broker_csv.py` | Parses broker CSV exports (XTB, TradeVille, ING) and stores transactions in SQLite |
+| `clasp/` | Google Apps Script source files, managed with clasp CLI |
+| `clasp/automation.js` | Daily portfolio snapshot recording (ETF, Stocks, NetWorth history sheets) |
+| `clasp/chart.js` | Server-side Apps Script exposing data to the web dashboard |
+| `clasp/chart_page.html` | Interactive web dashboard frontend (Chart.js, dark theme, zoom/pan) |
+| `utils/taxes/<year>/` | Per-year broker CSV exports and `investment_income.db` SQLite database |
 
 ## API Cost Target
 
@@ -31,8 +36,8 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
 
 1. **Fetch:** Google Sheets (CSV API) → Summary, Utilities, Tranzactii sheets
 2. **Compute:** FIFO tax table from transaction history
-3. **Scrape:** RSS feeds (ticker-specific + macro news)
-4. **Analyze:** Claude Sonnet (portfolio + news context)
+3. **Scrape:** RSS feeds (ticker-specific + macro news) + S&P 500 weekly performance via Yahoo Finance
+4. **Analyze:** Claude Sonnet (portfolio + news context, includes weekly ETF vs S&P 500 comparison)
 5. **Render:** Claude Haiku converts analysis to HTML
 6. **Distribute:** Email report + GitHub artifact
 

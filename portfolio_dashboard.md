@@ -55,8 +55,13 @@ A browser-based dashboard served from Apps Script that reads live data from the 
 
 ### Files
 
-- **`chart.gs`** — server-side Apps Script that exposes data to the frontend
-- **`chart_page.html`** — the full frontend: HTML, CSS, and JavaScript in one file
+All Apps Script source files live in `clasp/` in this repo and are pushed to Google Apps Script via clasp CLI.
+
+- **`clasp/chart.js`** — server-side Apps Script that exposes data to the frontend
+- **`clasp/chart_page.html`** — the full frontend: HTML, CSS, and JavaScript in one file
+- **`clasp/automation.js`** — daily snapshot recording functions
+- **`clasp/Code.js`** — entry-point / utility functions
+- **`clasp/.clasp.json`** — links the local directory to the remote Apps Script project
 
 ### Deployment
 
@@ -64,6 +69,12 @@ Deployed as a Google Apps Script **Web App**:
 - Execute as: Me
 - Who has access: Anyone (or restricted to yourself)
 - Each code change requires deploying a **new version** to bust Google's cache
+
+Push local changes to Apps Script:
+```bash
+cd clasp/
+clasp push
+```
 
 To view updated data, simply **reload the browser tab** — no redeployment needed for data changes.
 
