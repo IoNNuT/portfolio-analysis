@@ -432,10 +432,26 @@ def load_income_summary():
             sections.append(f"Realized gains: gross={g['gross']} RO-tax={g['ro_tax_paid']} net={g['net']}")
         i = data["interest"]
         if i["net"]:
-            if i["tax_withheld"]:
-                sections.append(f"Interest: gross={i['gross']} tax={i['tax_withheld']} net={i['net']}")
+            by_broker = i.get("by_broker", {})
+            if len(by_broker) > 1:
+                broker_parts = ", ".join(
+                    f"{b}: {v['net']}" for b, v in sorted(by_broker.items())
+                )
+                if i["tax_withheld"]:
+                    sections.append(f"Interest: gross={i['gross']} tax={i['tax_withheld']} net={i['net']} ({broker_parts})")
+                else:
+                    sections.append(f"Interest: {i['net']} ({broker_parts})")
+            elif by_broker:
+                broker_name = next(iter(by_broker))
+                if i["tax_withheld"]:
+                    sections.append(f"Interest ({broker_name}): gross={i['gross']} tax={i['tax_withheld']} net={i['net']}")
+                else:
+                    sections.append(f"Interest ({broker_name}): {i['net']}")
             else:
-                sections.append(f"Interest: {i['net']}")
+                if i["tax_withheld"]:
+                    sections.append(f"Interest: gross={i['gross']} tax={i['tax_withheld']} net={i['net']}")
+                else:
+                    sections.append(f"Interest: {i['net']}")
         if sections:
             lines.append(f"\n{ccy}:")
             for s in sections:
@@ -615,7 +631,7 @@ is_full   = portfolio_changed(signature)
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
     analysis_scope = """Perform a FULL analysis — 8 sections only:
-1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison from the data provided (1 line).
+1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
 2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest
@@ -628,7 +644,7 @@ Currency rule: Use EUR only for portfolio-level totals and cross-portfolio compa
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
-    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only. Section 1 must include the weekly ETF vs S&P 500 comparison from the data provided.
+    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only. Section 1 must include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
 Focus on sections 3-8 in full detail:
 3. Global News — 3-5 items from digest
 4. Stock-Specific News — per ticker from digest

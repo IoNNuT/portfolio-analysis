@@ -642,6 +642,17 @@ def get_ytd_summary(conn, year):
         int_tax   = round(sum(t for _, _, t, _ in int_rows), 2)
         int_net   = round(sum(n for _, _, _, n in int_rows), 2)
 
+        # Interest by broker
+        cur = conn.execute("""
+            SELECT broker, SUM(gross), SUM(tax_withheld), SUM(net)
+            FROM transactions
+            WHERE type = 'interest' AND currency = ? AND year = ?
+            GROUP BY broker
+            ORDER BY broker
+        """, (ccy, year))
+        int_by_broker = {row[0]: {"gross": round(row[1], 2), "tax": round(row[2], 2), "net": round(row[3], 2)}
+                         for row in cur.fetchall()}
+
         # Per-quarter breakdown
         quarters = {}
         all_quarters = sorted(set(
@@ -660,7 +671,7 @@ def get_ytd_summary(conn, year):
             "dividends": {"gross": div_gross, "tax_withheld": div_wht, "net": div_net},
             "ro_gov_bonds_exempt": {"total_coupons": exempt_total},
             "realized_gains": {"gross": gain_gross, "ro_tax_paid": ro_tax, "net": round(gain_gross - ro_tax, 2)},
-            "interest": {"gross": int_gross, "tax_withheld": int_tax, "net": int_net},
+            "interest": {"gross": int_gross, "tax_withheld": int_tax, "net": int_net, "by_broker": int_by_broker},
             "by_quarter": quarters,
         }
 
