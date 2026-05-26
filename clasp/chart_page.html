@@ -535,6 +535,11 @@
     const portRet   = computeTWR(validRows);
     const sp500Ret  = validRows.map(d => (d.sp500 / baseSP500 - 1) * 100);
 
+    const portDailyRet  = portRet.map((_, i) => i === 0 ? null :
+      ((1 + portRet[i] / 100) / (1 + portRet[i - 1] / 100) - 1) * 100);
+    const sp500DailyRet = validRows.map((d, i) => i === 0 ? null :
+      (d.sp500 / validRows[i - 1].sp500 - 1) * 100);
+
     const ctx = document.getElementById(canvasId).getContext('2d');
     if (compCharts[type]) compCharts[type].destroy();
 
@@ -584,8 +589,14 @@
             padding: 12,
             callbacks: {
               label: ctx => {
-                const v = ctx.parsed.y;
-                return ' ' + ctx.dataset.label + ': ' + (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+                const i       = ctx.dataIndex;
+                const cumVal  = ctx.parsed.y;
+                const cumStr  = (cumVal >= 0 ? '+' : '') + cumVal.toFixed(2) + '%';
+                const dailyArr = ctx.datasetIndex === 0 ? portDailyRet : sp500DailyRet;
+                const daily   = dailyArr[i];
+                if (daily === null) return ' ' + ctx.dataset.label + ': ' + cumStr + ' total';
+                const dailyStr = (daily >= 0 ? '+' : '') + daily.toFixed(2) + '%';
+                return ' ' + ctx.dataset.label + ': ' + dailyStr + ' today  (' + cumStr + ' total)';
               }
             }
           },
