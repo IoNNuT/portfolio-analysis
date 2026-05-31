@@ -199,6 +199,46 @@
     .range-btns { flex-wrap: wrap; }
     .chart-card { padding: 16px; }
   }
+
+  /* REPORT LIBRARY */
+  .report-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .report-list {
+    flex: 0 0 220px; max-height: 78vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .report-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; cursor: pointer;
+    color: var(--text); text-align: left;
+    display: flex; flex-direction: column; gap: 6px; transition: border-color 0.15s;
+  }
+  .report-item:hover, .report-item.active { border-color: var(--blue); }
+  .report-date { font-size: 14px; font-weight: 600; }
+  .report-badge {
+    align-self: flex-start; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .report-badge.full { background: rgba(74,158,255,0.15); color: var(--blue); }
+  .report-badge.incremental { background: rgba(138,144,158,0.18); color: var(--muted); }
+  .report-view {
+    flex: 1 1 auto; min-height: 78vh; position: relative;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); overflow: hidden;
+  }
+  .report-frame { width: 100%; height: 78vh; border: 0; background: #fff; display: none; }
+  .report-frame.active { display: block; }
+  .report-msg {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 0.5px;
+    padding: 24px; text-align: center;
+  }
+  @media (max-width: 720px) {
+    .report-layout { flex-direction: column; }
+    .report-list { flex-basis: auto; max-height: none; width: 100%; }
+    .report-view { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -213,6 +253,7 @@
   <button class="tab active" onclick="switchTab('etf', this)">ETF</button>
   <button class="tab" onclick="switchTab('stocks', this)">Stocks</button>
   <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
+  <button class="tab" onclick="switchTab('library', this); loadReports()">Library</button>
 </div>
 
 <!-- ETF PANEL -->
@@ -321,6 +362,21 @@
   </div>
 </div>
 
+<!-- LIBRARY PANEL -->
+<div class="panel" id="panel-library">
+  <div class="stats-label">WEEKLY ANALYSIS LIBRARY</div>
+  <div class="report-layout">
+    <div class="report-list" id="report-list">
+      <div class="report-msg" style="position:static">Loading…</div>
+    </div>
+    <div class="report-view">
+      <iframe id="report-frame" class="report-frame"
+              sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div class="report-msg" id="report-msg">Select a report to read it here.</div>
+    </div>
+  </div>
+</div>
+
 <div class="hint">CTRL+SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
 
 <script>
@@ -333,6 +389,56 @@
   const fmtp = v => (v * 100).toFixed(2) + '%';
   const sign = v => v >= 0 ? '+' : '';
   const cls  = v => v >= 0 ? 'positive' : 'negative';
+
+  let reportsLoaded = false;
+  function loadReports() {
+    if (reportsLoaded) return;
+    reportsLoaded = true;
+    google.script.run
+      .withSuccessHandler(renderReportList)
+      .withFailureHandler(e => {
+        document.getElementById('report-list').innerHTML =
+          '<div class="report-msg" style="position:static">Error: ' + e.message + '</div>';
+      })
+      .listReports();
+  }
+
+  function renderReportList(reports) {
+    const list = document.getElementById('report-list');
+    if (!reports || !reports.length) {
+      list.innerHTML = '<div class="report-msg" style="position:static">No reports yet.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    reports.forEach(r => {
+      const item = document.createElement('button');
+      item.className = 'report-item';
+      const badge = r.mode === 'Full' ? 'full' : 'incremental';
+      item.innerHTML =
+        '<span class="report-date">' + r.date + '</span>' +
+        '<span class="report-badge ' + badge + '">' + r.mode + '</span>';
+      item.onclick = () => openReport(r.id, item);
+      list.appendChild(item);
+    });
+  }
+
+  function openReport(id, item) {
+    document.querySelectorAll('.report-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    const frame = document.getElementById('report-frame');
+    const msg   = document.getElementById('report-msg');
+    frame.classList.remove('active');
+    msg.style.display = 'flex';
+    msg.textContent = 'Loading…';
+    google.script.run
+      .withSuccessHandler(html => {
+        frame.srcdoc = html;
+        frame.classList.add('active');
+        msg.style.display = 'none';
+      })
+      .withFailureHandler(e => { msg.textContent = 'Error: ' + e.message; })
+      .getReportHtml(id);
+  }
 
   function switchTab(tab, btn) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));

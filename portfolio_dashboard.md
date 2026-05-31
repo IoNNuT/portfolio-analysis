@@ -130,6 +130,24 @@ Range is calculated relative to the **last date in the data**, not today's date 
 
 ---
 
+## Part 4 — Weekly Analysis Library
+
+A **Library** tab that archives every weekly analysis HTML report and lets you read past reports inside the dashboard. Everything stays private — reports live in your Drive and are served by Apps Script (which runs as you), never published publicly.
+
+### How it works
+
+1. **Import (`reports.js` → `importReportsFromGmail`)** — a weekly time-driven trigger searches Gmail for the analysis emails (`subject:"Portfolio Analysis"`), extracts the HTML attachment, and saves it to a Drive folder as `portfolio-analysis-{date}-{mode}.html`. Idempotent: reruns only add reports not already in the folder.
+2. **List (`reports.js` → `listReports`)** — the Library tab calls this via `google.script.run`; it returns `[{id, date, mode}]` newest-first by parsing filenames in the folder.
+3. **Read (`reports.js` → `getReportHtml`)** — clicking a report fetches its HTML (guarded to the reports folder) and renders it in a sandboxed `<iframe srcdoc>` in the dashboard.
+
+### One-time setup
+
+1. Create a Drive folder (e.g. "Portfolio Analysis Reports") and copy its ID.
+2. Apps Script → **Project Settings → Script Properties** → add `REPORTS_FOLDER_ID = <folder id>`.
+3. `cd clasp && clasp push`, then deploy a **new version** (adds Drive + Gmail OAuth scopes → you'll re-authorize).
+4. Apps Script → **Triggers** → add a time-driven trigger for `importReportsFromGmail` running weekly on Monday (after the analysis email is sent).
+5. (Optional) Run `importReportsFromGmail` once manually to backfill existing reports from the last year.
+
 ## Known Gotchas
 
 - **Google caches Web App deployments aggressively** — always deploy a new version after changing `.gs` files. HTML changes are picked up on reload without redeployment.

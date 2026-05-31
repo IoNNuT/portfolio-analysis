@@ -24,7 +24,8 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `clasp/` | Google Apps Script source files, managed with clasp CLI |
 | `clasp/automation.js` | Daily portfolio snapshot recording (ETF, Stocks, NetWorth history sheets) |
 | `clasp/chart.js` | Server-side Apps Script exposing data to the web dashboard |
-| `clasp/chart_page.html` | Interactive web dashboard frontend (Chart.js, dark theme, zoom/pan) |
+| `clasp/chart_page.html` | Interactive web dashboard frontend (Chart.js, dark theme, zoom/pan) + Library tab |
+| `clasp/reports.js` | Weekly Analysis Library: Gmail→Drive importer + dashboard read API (listReports/getReportHtml) |
 | `utils/taxes/<year>/` | Per-year broker CSV exports and `investment_income.db` SQLite database |
 
 ## API Cost Target
