@@ -131,6 +131,48 @@
     margin-top: 24px;
   }
 
+  /* HOLDINGS TABLE */
+  .holdings-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px;
+    margin-bottom: 16px;
+    margin-top: 24px;
+  }
+  .table-wrap { overflow-x: auto; }
+  table.holdings {
+    width: auto;
+    margin: 0 auto;
+    border-collapse: collapse;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+  table.holdings th, table.holdings td {
+    padding: 6px 14px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  table.holdings th {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--subtext);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+  }
+  table.holdings th:hover { color: var(--text); }
+  table.holdings th .arrow { color: var(--blue); margin-left: 4px; }
+  table.holdings th.num, table.holdings td.num { text-align: right; }
+  table.holdings tbody tr:last-child td { border-bottom: none; }
+  table.holdings tbody tr:hover { background: rgba(79,142,247,0.05); }
+  table.holdings a.ticker { color: var(--blue); text-decoration: none; font-weight: 500; }
+  table.holdings a.ticker:hover { text-decoration: underline; }
+  table.holdings td.positive { color: var(--green); }
+  table.holdings td.negative { color: var(--red); }
+
   .chart-toolbar {
     display: flex;
     align-items: center;
@@ -310,6 +352,27 @@
     <div class="stat"><div class="stat-label">P&amp;L Change</div><div class="stat-value" id="stocks-period-pnl">—</div></div>
     <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="stocks-period-pct">—</div></div>
     <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="stocks-period-range" style="font-size:13px">—</div></div>
+  </div>
+  <div class="stats-label">HOLDINGS</div>
+  <div class="holdings-card">
+    <div id="holdings-loading" class="loading">LOADING HOLDINGS...</div>
+    <div class="table-wrap" id="holdings-wrap" style="display:none">
+      <table class="holdings" id="holdings-table">
+        <thead>
+          <tr id="holdings-head">
+            <th data-key="ticker"       data-type="str">Ticker</th>
+            <th data-key="price"        data-type="num" class="num">Price</th>
+            <th data-key="mv"           data-type="num" class="num">Mkt Value</th>
+            <th data-key="dailyChange"  data-type="num" class="num">Day</th>
+            <th data-key="weeklyChange" data-type="num" class="num">Week</th>
+            <th data-key="shares"       data-type="num" class="num">Shares</th>
+            <th data-key="pnlAbs"       data-type="num" class="num">P&amp;L</th>
+            <th data-key="pnlPct"       data-type="num" class="num">P&amp;L %</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
   <div class="chart-card">
     <div class="chart-toolbar">
@@ -775,6 +838,145 @@
     buildChart(type, rows);
     if (type !== 'nw') buildComparisonChart(type, rows);
   }
+
+  // ── HOLDINGS TABLE ──────────────────────────────────────────────────────
+  function holdingsCell(text, cls) {
+    const td = document.createElement('td');
+    if (cls) td.className = cls;
+    td.textContent = (text === null || text === undefined || text === '') ? '—' : text;
+    return td;
+  }
+
+  function holdingsTickerCell(ticker) {
+    const td = document.createElement('td');
+    const a  = document.createElement('a');
+    a.className   = 'ticker';
+    a.href        = 'https://finance.yahoo.com/quote/' + encodeURIComponent(ticker);
+    a.target      = '_blank';
+    a.rel         = 'noopener';
+    a.textContent = ticker;
+    td.appendChild(a);
+    return td;
+  }
+
+  // Daily change arrives as a fraction (e.g. 0.0394 → +3.94%).
+  function holdingsPctCell(frac) {
+    const td = document.createElement('td');
+    td.className = 'num';
+    if (frac === null || frac === undefined) { td.textContent = '—'; return td; }
+    const pct = frac * 100;
+    td.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    td.className   = 'num ' + (pct >= 0 ? 'positive' : 'negative');
+    return td;
+  }
+
+  // Display strings from the sheet (already carry % / currency); colour by sign.
+  function holdingsSignedCell(str) {
+    const td = document.createElement('td');
+    td.className = 'num';
+    const s = (str || '').trim();
+    if (!s) { td.textContent = '—'; return td; }
+    td.textContent = s;
+    if (/-/.test(s))            td.className = 'num negative';
+    else if (/[0-9]/.test(s))   td.className = 'num positive';
+    return td;
+  }
+
+  let holdingsRows = [];
+  let holdingsWired = false;
+  const holdingsSort = { key: null, dir: 1 };
+
+  // Pull a comparable number out of a display string ("$1,036.84", "-1.46%", 0.0394).
+  function holdingsNum(v) {
+    if (v === null || v === undefined || v === '') return NaN;
+    if (typeof v === 'number') return v;
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? NaN : n;
+  }
+
+  function drawHoldings(rows) {
+    const tbody = document.querySelector('#holdings-table tbody');
+    tbody.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.appendChild(holdingsTickerCell(r.ticker));
+      tr.appendChild(holdingsCell(r.price, 'num'));
+      tr.appendChild(holdingsCell(r.mv, 'num'));
+      tr.appendChild(holdingsPctCell(r.dailyChange));
+      tr.appendChild(holdingsSignedCell(r.weeklyChange));
+      tr.appendChild(holdingsCell(r.shares, 'num'));
+      tr.appendChild(holdingsSignedCell(r.pnlAbs));
+      tr.appendChild(holdingsSignedCell(r.pnlPct));
+      tbody.appendChild(tr);
+    });
+  }
+
+  function sortAndDraw() {
+    const key  = holdingsSort.key;
+    const dir  = holdingsSort.dir;
+    const rows = holdingsRows.slice();
+    if (key) {
+      const th   = document.querySelector('#holdings-head th[data-key="' + key + '"]');
+      const type = th ? th.dataset.type : 'num';
+      rows.sort((a, b) => {
+        if (type === 'str') {
+          const av = (a[key] || '').toUpperCase(), bv = (b[key] || '').toUpperCase();
+          return av < bv ? -dir : av > bv ? dir : 0;
+        }
+        const av = holdingsNum(a[key]), bv = holdingsNum(b[key]);
+        if (isNaN(av) && isNaN(bv)) return 0;
+        if (isNaN(av)) return 1;          // blanks sort last regardless of dir
+        if (isNaN(bv)) return -1;
+        return (av - bv) * dir;
+      });
+    }
+    drawHoldings(rows);
+    updateSortArrows();
+  }
+
+  function updateSortArrows() {
+    document.querySelectorAll('#holdings-head th').forEach(th => {
+      th.textContent = th.dataset.label;
+      if (th.dataset.key === holdingsSort.key) {
+        const arrow = document.createElement('span');
+        arrow.className = 'arrow';
+        arrow.textContent = holdingsSort.dir === 1 ? '▲' : '▼';
+        th.appendChild(arrow);
+      }
+    });
+  }
+
+  function wireHoldingsHeader() {
+    if (holdingsWired) return;
+    holdingsWired = true;
+    document.querySelectorAll('#holdings-head th').forEach(th => {
+      th.dataset.label = th.textContent;   // base label, before any arrow
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        if (holdingsSort.key === key) holdingsSort.dir *= -1;
+        else { holdingsSort.key = key; holdingsSort.dir = 1; }
+        sortAndDraw();
+      });
+    });
+  }
+
+  function renderHoldings(rows) {
+    const loading = document.getElementById('holdings-loading');
+    const wrap    = document.getElementById('holdings-wrap');
+    if (!rows || !rows.length) { loading.textContent = 'NO HOLDINGS DATA'; return; }
+
+    holdingsRows = rows;
+    wireHoldingsHeader();
+    sortAndDraw();
+
+    loading.style.display = 'none';
+    wrap.style.display = 'block';
+  }
+
+  google.script.run
+    .withSuccessHandler(renderHoldings)
+    .withFailureHandler(e => document.getElementById('holdings-loading').textContent = 'ERROR: ' + e.message)
+    .getStockHoldings();
 
   // Load all three in parallel
   google.script.run.withSuccessHandler(rows => initPanel('etf', rows))

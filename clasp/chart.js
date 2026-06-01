@@ -43,6 +43,97 @@ function getStocksData() {
   }));
 }
 
+// Per-ticker Stocks holdings for the dashboard table.
+// Reads the Stocks table from the "Summary" sheet (the header row containing
+// both "Ticker" and "Weekly Change"), preserving the sheet's display strings
+// so currency symbols / % signs survive. The daily % change is not stored in
+// the sheet, so it's fetched live from Yahoo Finance.
+function getStockHoldings() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Summary");
+  if (!sheet) return [];
+
+  const disp = sheet.getDataRange().getDisplayValues();
+
+  // Locate the Stocks table header (ETF table lacks a "Weekly Change" column).
+  let headerRow = -1;
+  const col = {};
+  for (let i = 0; i < disp.length; i++) {
+    const row = disp[i];
+    if (row.indexOf("Ticker") !== -1 && row.indexOf("Weekly Change") !== -1) {
+      headerRow = i;
+      row.forEach((h, j) => { col[h.trim()] = j; });
+      break;
+    }
+  }
+  if (headerRow === -1) return [];
+
+  const idxTicker = col["Ticker"];
+  const holdings = [];
+  for (let i = headerRow + 1; i < disp.length; i++) {
+    const ticker = (disp[i][idxTicker] || "").trim();
+    if (!ticker) break;  // blank ticker = footer/total row → table ends
+    holdings.push({
+      ticker:       ticker,
+      price:        (disp[i][col["Price"]]         || "").trim(),
+      weeklyChange: (disp[i][col["Weekly Change"]] || "").trim(),
+      shares:       (disp[i][col["Shares"]]        || "").trim(),
+      mv:           (disp[i][col["MV"]]            || "").trim(),
+      pnlAbs:       (disp[i][col["P&L (Abs)"]]     || "").trim(),
+      pnlPct:       (disp[i][col["P&L (%)"]]       || "").trim(),
+      dailyChange:  null
+    });
+  }
+
+  const dailyMap = _fetchDailyChanges_(holdings.map(h => h.ticker));
+  holdings.forEach(h => { h.dailyChange = dailyMap[h.ticker]; });
+
+  return holdings;
+}
+
+// Returns { ticker: dailyChangeFraction|null }, e.g. { PTCT: 0.0394 }.
+// Computed as (latest price − previous trading day's close) / previous close.
+function _fetchDailyChanges_(tickers) {
+  const out = {};
+  if (!tickers.length) return out;
+
+  const requests = tickers.map(t => ({
+    url: "https://query1.finance.yahoo.com/v8/finance/chart/" +
+         encodeURIComponent(t) + "?interval=1d&range=5d",
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS/1.0)" },
+    muteHttpExceptions: true
+  }));
+
+  let responses;
+  try {
+    responses = UrlFetchApp.fetchAll(requests);
+  } catch (e) {
+    Logger.log("_fetchDailyChanges_ error: " + e);
+    return out;
+  }
+
+  responses.forEach((resp, i) => {
+    const t = tickers[i];
+    out[t] = null;
+    try {
+      if (resp.getResponseCode() !== 200) return;
+      const result = JSON.parse(resp.getContentText()).chart.result[0];
+      const closes = (result.indicators.quote[0].close || []).filter(c => c != null);
+      const last   = result.meta.regularMarketPrice != null
+        ? result.meta.regularMarketPrice
+        : closes[closes.length - 1];
+      const prev   = closes[closes.length - 2];
+      if (last != null && prev != null && prev !== 0) {
+        out[t] = (last - prev) / prev;
+      }
+    } catch (e) {
+      Logger.log("_fetchDailyChanges_ parse error for " + t + ": " + e);
+    }
+  });
+
+  return out;
+}
+
 function getNetWorthData() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const sheet   = ss.getSheetByName("NetWorth History");

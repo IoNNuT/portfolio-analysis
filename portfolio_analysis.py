@@ -130,8 +130,16 @@ def strip_html(text):
 def md5(text):
     return hashlib.md5(text.encode()).hexdigest()
 
-def claude_call(model, system, user, max_tokens):
+def claude_call(model, system, user, max_tokens, temperature=None):
     """Returns (text, cost_usd)."""
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if temperature is not None:
+        payload["temperature"] = temperature
     response = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={
@@ -139,12 +147,7 @@ def claude_call(model, system, user, max_tokens):
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         },
-        json={
-            "model": model,
-            "max_tokens": max_tokens,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
-        },
+        json=payload,
         timeout=300,
     )
     if response.status_code != 200:
@@ -692,36 +695,60 @@ analysis_text, sonnet_cost = claude_call(
 print(f"[{TODAY_STR}] Analysis: {len(analysis_text)} chars")
 
 # ── STEP 2: HAIKU HTML RENDERING ──────────────────────────────────────────────
-HAIKU_SYSTEM = """You are an HTML report renderer. Convert the analysis text into a clean,
-readable HTML report. Use simple styling only. Output ONLY the complete HTML document."""
+# The report format is pinned to a fixed golden template (the 2026-05-25 layout).
+# Haiku reproduces the template's structure/CSS verbatim and only swaps in the new
+# data — this keeps every weekly report visually identical week-to-week.
+TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "report_template.html")
+with open(TEMPLATE_PATH, encoding="utf-8") as f:
+    TEMPLATE_HTML = f.read().replace("__DASHBOARD_URL__", DASHBOARD_URL)
 
-HAIKU_USER = f"""Convert this portfolio analysis into a clean HTML report.
+HAIKU_SYSTEM = """You are an HTML report renderer. You are given a GOLDEN TEMPLATE (a complete, \
+styled HTML report) and a new portfolio analysis. Reproduce the template EXACTLY — identical <style> \
+block, identical section order and headings, identical HTML structure and CSS classes — but replace its \
+example data with data from the new analysis. Do not invent, add, remove, or reorder sections, and do not \
+change any CSS. Output ONLY the raw HTML document starting with <!DOCTYPE html>. No markdown, no code \
+fences, no commentary."""
 
-Title: portfolio-analysis-{TODAY_STR}
+HAIKU_USER = f"""Render the portfolio analysis below into HTML by reproducing the GOLDEN TEMPLATE exactly.
 
-Style:
-- White background, dark text, simple sans-serif font
-- Use a simple <table> for data, <h2> for section headers
-- Green for positive values, red for negative
-- No external dependencies, fully self-contained
-- Mobile-friendly with max-width: 800px centered
+Rules:
+- Copy the template's <style> block verbatim — same colours, fonts, spacing, class names.
+- Keep the same 8 sections in the same order with the same headings and numbering.
+- Reuse the template's component patterns: .summary-box rows, the holdings <table>, .stock-detail cards
+  grouped under "Sell Recommendations" / "Hold Recommendations", .section-intro callouts,
+  .alert / .alert.opportunity / .alert.sell cards, and .summary-row lists.
+- Use class="positive" for gains and class="negative" for losses.
+- Keep the dashboard button at the very top with the exact href already present in the template.
+- Populate every section from the analysis. The template's data is only an EXAMPLE — replace all of it.
+  If the analysis has no data for a row, omit that row (never leave example values in).
+- Do NOT add any "API Cost" footer; that is appended separately.
+- Set the <title> and the .report-date to {TODAY_STR}.
+- Output raw HTML only. No ``` fences, no commentary.
 
-Dashboard Link:
-Add a prominent button/link at the TOP of the report: "View Interactive Dashboard"
-URL: {DASHBOARD_URL}
-Style it as a blue button or link that stands out.
+===== GOLDEN TEMPLATE (reproduce this structure and style exactly) =====
+{TEMPLATE_HTML}
 
-Analysis to render:
+===== NEW ANALYSIS TO RENDER (this is the data source) =====
+Report date: {TODAY_STR}
+
 {analysis_text}"""
 
 print(f"[{TODAY_STR}] Step 2: Haiku HTML rendering...")
 html_report, haiku_cost = claude_call(
-    model      = "claude-haiku-4-5-20251001",
-    system     = HAIKU_SYSTEM,
-    user       = HAIKU_USER,
-    max_tokens = 10000,
+    model       = "claude-haiku-4-5-20251001",
+    system      = HAIKU_SYSTEM,
+    user        = HAIKU_USER,
+    max_tokens  = 10000,
+    temperature = 0,
 )
 print(f"[{TODAY_STR}] Report: {len(html_report)} chars")
+
+# Defensive: strip any stray markdown code fences Haiku may wrap the document in.
+html_report = html_report.strip()
+if html_report.startswith("```"):
+    html_report = html_report[html_report.find("\n") + 1:]
+    html_report = html_report.rsplit("```", 1)[0]
+    html_report = html_report.strip()
 
 if not html_report.strip():
     raise RuntimeError("Empty HTML report from Haiku")

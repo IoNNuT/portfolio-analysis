@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #ffffff;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .dashboard-link {
+            display: inline-block;
+            background: #0066cc;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            transition: background 0.3s ease;
+        }
+        .dashboard-link:hover {
+            background: #0052a3;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #222;
+        }
+        .report-date {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 18px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #222;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 8px;
+        }
+        h3 {
+            font-size: 16px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            color: #222;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        th {
+            background: #f5f5f5;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        tr:hover {
+            background: #fafafa;
+        }
+        .positive {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .negative {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .neutral {
+            color: #666;
+        }
+        .section-intro {
+            background: #f9f9f9;
+            padding: 15px;
+            border-left: 4px solid #0066cc;
+            margin: 15px 0;
+            border-radius: 2px;
+        }
+        .alert {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 2px;
+            font-size: 14px;
+        }
+        .alert.sell {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .alert.hold {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+        }
+        .alert.opportunity {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .stock-detail {
+            background: #f9f9f9;
+            padding: 12px;
+            margin: 10px 0;
+            border-left: 3px solid #ddd;
+            border-radius: 2px;
+            font-size: 14px;
+        }
+        .stock-meta {
+            margin-top: 8px;
+            color: #666;
+            font-size: 13px;
+        }
+        .stock-action {
+            margin-top: 10px;
+        }
+        .action-sell {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .action-hold {
+            color: #17a2b8;
+            font-weight: 600;
+        }
+        .summary-box {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+        .label {
+            font-weight: 600;
+        }
+        ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="__DASHBOARD_URL__" class="dashboard-link">📊 View Interactive Dashboard</a>
+
+        <h1>Portfolio Analysis</h1>
+        <div class="report-date">Report Date: 2026-05-25</div>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 1 — Portfolio Overview                                -->
+        <!-- account rollup (summary-box) + ONE holdings table +          -->
+        <!-- S&P comparison (section-intro) + allocation notes (ul)       -->
+        <!-- ============================================================= -->
+        <h2>1. Portfolio Overview</h2>
+        <div class="section-intro">
+            <strong>Total Portfolio Value (Approximate): €57,913</strong>
+        </div>
+
+        <div class="summary-box">
+            <div class="summary-row">
+                <span class="label">ETF Portfolio (XTB)</span>
+                <span>€30,737</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Stocks Portfolio (XTB)</span>
+                <span>$4,859 (~€4,189)</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">BET ETF (TradeVille RON)</span>
+                <span>RON 15,681 (~€2,987)</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">RO Gov Bonds (TradeVille)</span>
+                <span>€20,000</span>
+            </div>
+        </div>
+
+        <h3>Holdings</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Market Value</th>
+                    <th>Invested</th>
+                    <th>P&amp;L</th>
+                    <th>P&amp;L %</th>
+                    <th>Weight</th>
+                    <th>Target</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- repeat one <tr> per holding -->
+                <tr>
+                    <td>VUAA.DE</td>
+                    <td>€8,972</td>
+                    <td>€7,448</td>
+                    <td class="positive">€1,524</td>
+                    <td class="positive">+20.5%</td>
+                    <td>29%</td>
+                    <td>30%</td>
+                </tr>
+                <tr style="background: #f5f5f5; font-weight: 600;">
+                    <td>TOTAL</td>
+                    <td>€30,737</td>
+                    <td>€26,262</td>
+                    <td class="positive">€4,475</td>
+                    <td class="positive">+17.0%</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="section-intro">
+            <strong>Performance vs. S&amp;P 500 (Past 7 Days):</strong><br>
+            ETF Portfolio: <span class="positive">+1.89%</span> vs S&amp;P 500: +0.95% → <span class="positive">Outperformed by +0.94%</span><br>
+            Stocks Portfolio: <span class="positive">+3.00%</span> vs S&amp;P 500: +0.95% → <span class="positive">Outperformed by +2.05%</span>
+        </div>
+
+        <h3>Allocation Notes</h3>
+        <ul>
+            <li><strong>IS3N (Emerging Markets)</strong> – +2% overweight (trim on next rebalance)</li>
+            <li><strong>EUNA (Bonds)</strong> – <span class="negative">-3% underweight</span> (prioritize in next monthly buy)</li>
+        </ul>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 2 — Individual Stocks                                 -->
+        <!-- section-intro totals, then .stock-detail cards GROUPED by     -->
+        <!-- action under h3 "Sell Recommendations" / "Hold Recommendations"-->
+        <!-- ============================================================= -->
+        <h2>2. Individual Stocks</h2>
+        <div class="section-intro">
+            All values in USD unless stated. Total Portfolio Value: $4,859 | Invested: $4,949 | P&amp;L: <span class="negative">-$90 / -1.8%</span>
+        </div>
+
+        <h3>Sell Recommendations</h3>
+        <!-- repeat one .stock-detail per SELL position -->
+        <div class="stock-detail">
+            <strong>PTCT — PTC Therapeutics</strong><br>
+            Price: $68.81 | Shares: 4 | MV: $275 | P&amp;L: <span class="positive">+$79 / +40.2%</span>
+            <div class="stock-meta">Cost: $49.09 | &gt;365 days | In profit</div>
+            <div class="stock-action"><span class="action-sell">ACTION: SELL</span> — Meets both sell triggers (&gt;365 days, in profit). Realize at 3% tax rate.</div>
+        </div>
+
+        <h3>Hold Recommendations</h3>
+        <!-- repeat one .stock-detail per HOLD position -->
+        <div class="stock-detail">
+            <strong>AMZN — Amazon</strong><br>
+            Price: $266.32 | Shares: 2 | MV: $533 | P&amp;L: <span class="positive">+$66 / +14.1%</span>
+            <div class="stock-meta">Cost: $233.51 | Core long-term position</div>
+            <div class="stock-action"><span class="action-hold">ACTION: HOLD</span> — Cloud + AI story intact. No negative fundamental signal.</div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 3 — Global News                                       -->
+        <!-- ============================================================= -->
+        <h2>3. Global News</h2>
+        <ul>
+            <li><strong>Oil prices falling:</strong> Potential macro positive for inflation/rates globally; lower energy input costs benefiting equities broadly.</li>
+            <li><strong>Fed constraint:</strong> Rates-higher-for-longer risk remains. Relevant for bond duration and growth-stock valuations.</li>
+        </ul>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 4 — Stock-Specific News                               -->
+        <!-- one h3 per ticker, ul of items beneath                        -->
+        <!-- ============================================================= -->
+        <h2>4. Stock-Specific News</h2>
+        <h3>NVO — Novo Nordisk</h3>
+        <ul>
+            <li>Competitive pressure from Lilly's new GLP-1 drug; monitor closely. Thesis under stress but not an immediate sell.</li>
+        </ul>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 5 — Romania News                                      -->
+        <!-- ============================================================= -->
+        <h2>5. Romania News</h2>
+        <p>No material financial/market news from the Romanian digest this week. None portfolio-relevant.</p>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 6 — Crypto / Bitcoin                                  -->
+        <!-- 1 short paragraph outlook                                     -->
+        <!-- ============================================================= -->
+        <h2>6. Crypto / Bitcoin</h2>
+        <p>Bitcoin under selling pressure this week — spot ETF outflows hit a record while AI equities rally, suggesting capital rotation out of crypto into equities. No portfolio exposure; no action required, but worth monitoring for broader contagion.</p>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 7 — Watchlist & Alerts                                -->
+        <!-- .alert cards: .alert.opportunity / .alert.sell / plain .alert -->
+        <!-- ============================================================= -->
+        <h2>7. Watchlist &amp; Action Items</h2>
+
+        <div class="alert opportunity">
+            <strong>💡 OPPORTUNITY:</strong> EUNA.DE (Bonds ETF) is -3% underweight vs 10% target. Prioritize in next 1-2 monthly ETF buys.
+        </div>
+
+        <div class="alert sell">
+            <strong>⚠️ ALERT:</strong> Positions flagged for sale: PTCT, OTEX, LULU, OSPN. Freeing this capital removes drag and enables redeployment.
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 8 — Investment Income YTD                             -->
+        <!-- one .summary-box per currency (EUR / RON / USD)               -->
+        <!-- ============================================================= -->
+        <h2>8. Investment Income — YTD 2026</h2>
+
+        <h3>EUR (XTB + TradeVille)</h3>
+        <div class="summary-box">
+            <div class="summary-row">
+                <span class="label">Dividends</span>
+                <span>Gross €24.75 | Withheld €0.00 | Net €24.75</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">RO Gov Bonds (Coupons)</span>
+                <span class="positive">€375.00 (TAX-EXEMPT)</span>
+            </div>
+        </div>
+
+        <h3>USD (XTB)</h3>
+        <div class="summary-box">
+            <div class="summary-row">
+                <span class="label">Dividends</span>
+                <span>Gross $20.82 | Withheld $2.15 | Net $18.67</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">Realized Gains</span>
+                <span>Gross $879.78 | RO Tax $42.24 | Net $837.54</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Report generated: 2026-05-25 | Data current as of report date | This analysis is for informational purposes only and does not constitute financial advice.</p>
+        </div>
+    </div>
+</body>
+</html>
