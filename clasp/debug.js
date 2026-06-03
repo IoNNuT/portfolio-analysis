@@ -8,6 +8,22 @@ function debugETFRaw() {
   });
 }
 
+// Run from the Apps Script editor, then View > Logs. Shows every Summary row
+// that mentions "Invested" or "Return" so we can see the exact header text and
+// the table layout (stacked vs side-by-side), and what getEtfTotals returns.
+function debugEtfTotals() {
+  const disp = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName("Summary").getDataRange().getDisplayValues();
+
+  disp.forEach((row, i) => {
+    if (row.some(c => /invest|return/i.test(c))) {
+      Logger.log(`Row ${i}: ${JSON.stringify(row.map(c => c.trim()).filter(c => c !== ""))}`);
+    }
+  });
+
+  Logger.log("getEtfTotals() => " + JSON.stringify(getEtfTotals()));
+}
+
 function debugDates() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("ETF History");
   const data  = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();

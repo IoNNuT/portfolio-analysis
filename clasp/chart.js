@@ -28,22 +28,29 @@ function getChartData() {
 
 // Aggregate Invested vs Total Return (incl. dividends) across the whole ETF
 // portfolio, for the ETF tab's bar chart. Reads the ETFs table from the
-// "Summary" sheet — located by the header row containing both "Invested" and
-// "TTL Return ABS (with dividends)" — and sums those two columns over the
-// holding rows, stopping at the first blank or "Total" row so a footer total
-// isn't double-counted. Returns { invested, ret } in €, or null if not found.
+// "Summary" sheet — identified as the header row that has both "Invested" and
+// "TTL Return (Abs)" but NO "Weekly Change" column (the latter marks the Stocks
+// table, which shares those two headers). Sums the two columns over the holding
+// rows, stopping at the next table's header, a blank row, or a "Total" row.
+// Returns { invested, ret } in €, or null if the table isn't found.
 function getEtfTotals() {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Summary");
   if (!sheet) return null;
 
   const disp = sheet.getDataRange().getDisplayValues();
+  const norm = c => String(c).replace(/\s+/g, " ").trim().toLowerCase();
 
   let headerRow = -1, idxInv = -1, idxRet = -1;
   for (let i = 0; i < disp.length; i++) {
-    const inv = disp[i].indexOf("Invested");
-    const ret = disp[i].indexOf("TTL Return ABS (with dividends)");
-    if (inv !== -1 && ret !== -1) {
+    let inv = -1, ret = -1, weekly = false;
+    disp[i].forEach((c, j) => {
+      const n = norm(c);
+      if (n === "invested")          inv = inv === -1 ? j : inv;
+      if (n === "ttl return (abs)")  ret = ret === -1 ? j : ret;
+      if (n === "weekly change")     weekly = true;
+    });
+    if (inv !== -1 && ret !== -1 && !weekly) {   // ETF table, not Stocks
       headerRow = i; idxInv = inv; idxRet = ret;
       break;
     }
@@ -57,9 +64,11 @@ function getEtfTotals() {
 
   let invested = 0, ret = 0;
   for (let i = headerRow + 1; i < disp.length; i++) {
-    if (!(disp[i][idxInv] || "").trim()) break;        // blank Invested = table end
-    if (disp[i].some(c => /total/i.test(c))) break;    // footer total row
-    invested += num(disp[i][idxInv]);
+    const cell = (disp[i][idxInv] || "").trim();
+    if (!cell) break;                                          // blank row = table end
+    if (disp[i].some(c => norm(c) === "ticker")) break;        // next table's header
+    if (disp[i].some(c => /total/i.test(c))) break;            // footer total row
+    invested += num(cell);
     ret      += num(disp[i][idxRet]);
   }
 
