@@ -29,12 +29,20 @@ TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%Y-%m-%d")
 DB_PATH   = os.path.join(os.path.dirname(__file__), "seen_articles.db")
 
-# Google Sheet — Tranzactii gid must be set via env var TRANZACTII_GID
 SHEET_ID   = "1qbb0x_kNtIUp4cq-_O9uFi6stbcSPwTeTnXOd1DbzOo"
 SHEET_GIDS = {
     "Summary":    "1633571629",
     "Utilities":  "2066207814",
-    "Tranzactii": "1445112517",
+}
+
+# Clean per-portfolio transaction tabs feeding the FIFO tax table. Each is a flat
+# ledger with headers on row 1: Date | Ticker | Price | Transaction | Shares | Amount.
+# Keyed by tab name -> gid; all tabs are unioned. The gid is in the tab's URL
+# (the #gid=... at the end). Add a line here as you create each tab.
+TX_SHEETS = {
+    "TXs_USD": "1053431702",       # Stocks Portfolio (XTB, USD)
+    # "TXs_EUR": "PASTE_GID_HERE", # ETF Portfolio (XTB, EUR)  — add once created
+    # "TXs_RON": "PASTE_GID_HERE", # TradeVille (RON)          — add once created
 }
 
 # Column resolution — case-insensitive substring match on the sheet headers.
@@ -192,7 +200,9 @@ def parse_date(s):
     s = (s or "").strip()
     if not s:
         return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y", "%m/%d/%Y", "%Y/%m/%d"):
+    # Transaction tabs use US M/D/Y, so try month-first before day-first.
+    # (ISO stays first for the History sheet; day-first remains a fallback.)
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%d.%m.%Y", "%Y/%m/%d"):
         try:
             return datetime.datetime.strptime(s, fmt).date()
         except ValueError:
@@ -598,21 +608,32 @@ with open(tax_path, "r", encoding="utf-8") as f:
 print(f"[{TODAY_STR}] Fetching portfolio data...")
 summary_csv    = fetch_sheet_csv(SHEET_GIDS["Summary"],    "Summary")
 utilities_csv  = fetch_sheet_csv(SHEET_GIDS["Utilities"],  "Utilities")
-tranzactii_csv = fetch_sheet_csv(SHEET_GIDS["Tranzactii"], "Tranzactii")
 
-summary_headers,    summary_rows    = parse_csv(summary_csv)
-tranzactii_headers, tranzactii_rows = parse_csv(tranzactii_csv)
-
-summary_cols    = resolve_columns(summary_headers,    SUMMARY_COL_HINTS)
-tranzactii_cols = resolve_columns(tranzactii_headers, TRANZACTII_COL_HINTS)
-
+summary_headers, summary_rows = parse_csv(summary_csv)
+summary_cols = resolve_columns(summary_headers, SUMMARY_COL_HINTS)
 print(f"[{TODAY_STR}] Summary cols resolved: {summary_cols}")
-print(f"[{TODAY_STR}] Tranzactii cols resolved: {tranzactii_cols}")
 
 symbols = extract_symbols(summary_rows, summary_cols)
 print(f"[{TODAY_STR}] Symbols from Summary: {symbols}")
 
-tax_data  = build_tax_table(tranzactii_rows, tranzactii_cols, TODAY)
+# Build the FIFO tax table from the clean per-portfolio transaction tabs, unioned.
+# Each tab resolves its own columns; rows are normalized to canonical keys so tabs
+# with slightly different headers still combine cleanly.
+_REQUIRED_TX = ("date", "ticker", "action", "shares")
+tx_rows = []
+for tab, gid in TX_SHEETS.items():
+    headers, rows = parse_csv(fetch_sheet_csv(gid, tab))
+    if not rows:
+        print(f"[{TODAY_STR}] Warning: {tab} empty or unavailable")
+        continue
+    cols = resolve_columns(headers, TRANZACTII_COL_HINTS)
+    if not all(cols.get(k) for k in _REQUIRED_TX):
+        print(f"[{TODAY_STR}] Warning: {tab} missing required columns, skipped: {cols}")
+        continue
+    tx_rows.extend({k: r.get(cols[k], "") for k in _REQUIRED_TX} for r in rows)
+    print(f"[{TODAY_STR}] {tab}: {len(rows)} transactions")
+
+tax_data  = build_tax_table(tx_rows, {k: k for k in _REQUIRED_TX}, TODAY) if tx_rows else None
 tax_table = format_tax_table(tax_data)
 print(f"[{TODAY_STR}] Tax table:\n{tax_table}")
 
