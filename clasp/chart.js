@@ -26,13 +26,14 @@ function getChartData() {
   }));
 }
 
-// Aggregate Invested vs Total Return (incl. dividends) across the whole ETF
-// portfolio, for the ETF tab's bar chart. Reads the ETFs table from the
-// "Summary" sheet — identified as the header row that has both "Invested" and
-// "TTL Return (Abs)" but NO "Weekly Change" column (the latter marks the Stocks
-// table, which shares those two headers). Sums the two columns over the holding
-// rows, stopping at the next table's header, a blank row, or a "Total" row.
-// Returns { invested, ret } in €, or null if the table isn't found.
+// Invested vs Total Return (incl. dividends) for the whole ETF portfolio, for
+// the ETF tab's bar chart. Locates the ETFs table in the "Summary" sheet — the
+// header row that has both "Invested" and "TTL Return (Abs)" but NO "Weekly
+// Change" column (the latter marks the Stocks table, which shares those two
+// headers). The table already carries a footer row with the column sums, so we
+// read those directly rather than re-summing the holdings (which would also
+// pick up the footer and double the totals). Returns { invested, ret } in €,
+// or null if the table/footer isn't found.
 function getEtfTotals() {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Summary");
@@ -62,17 +63,21 @@ function getEtfTotals() {
     return isNaN(n) ? 0 : n;
   };
 
-  let invested = 0, ret = 0;
+  // The footer is the first row after the header whose Ticker cell is empty
+  // (or "Total") but whose Invested cell still carries a value — that's where
+  // the sheet keeps the column sums.
+  let idxTicker = -1;
+  disp[headerRow].forEach((c, j) => { if (norm(c) === "ticker") idxTicker = j; });
+
   for (let i = headerRow + 1; i < disp.length; i++) {
+    const ticker = idxTicker !== -1 ? (disp[i][idxTicker] || "").trim() : "";
+    if (ticker && !/total/i.test(ticker)) continue;   // holding row — skip to footer
     const cell = (disp[i][idxInv] || "").trim();
-    if (!cell) break;                                          // blank row = table end
-    if (disp[i].some(c => norm(c) === "ticker")) break;        // next table's header
-    if (disp[i].some(c => /total/i.test(c))) break;            // footer total row
-    invested += num(cell);
-    ret      += num(disp[i][idxRet]);
+    if (!cell) break;                                 // blank gap, no footer found
+    return { invested: num(cell), ret: num(disp[i][idxRet]) };
   }
 
-  return { invested: invested, ret: ret };
+  return null;
 }
 
 function getStocksData() {
