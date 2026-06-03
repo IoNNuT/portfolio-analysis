@@ -131,6 +131,21 @@
     margin-top: 24px;
   }
 
+  /* Two charts side by side, 50/50. */
+  .chart-row {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+    margin-top: 24px;
+    margin-bottom: 16px;
+  }
+  .chart-row > .chart-card {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
   /* HOLDINGS TABLE */
   .holdings-card {
     background: var(--surface);
@@ -277,6 +292,7 @@
     padding: 24px; text-align: center;
   }
   @media (max-width: 720px) {
+    .chart-row { flex-direction: column; }
     .report-layout { flex-direction: column; }
     .report-list { flex-basis: auto; max-height: none; width: 100%; }
     .report-view { width: 100%; }
@@ -313,21 +329,30 @@
     <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="etf-period-pct">—</div></div>
     <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="etf-period-range" style="font-size:13px">—</div></div>
   </div>
-  <div class="chart-card">
-    <div class="chart-toolbar">
-      <div class="chart-title">Market Value vs Invested</div>
-      <div class="range-btns" id="etf-range-btns">
-        <button class="range-btn" onclick="setRange('etf', 1, this)">1D</button>
-        <button class="range-btn" onclick="setRange('etf', 7, this)">1W</button>
-        <button class="range-btn" onclick="setRange('etf', 30, this)">1M</button>
-        <button class="range-btn" onclick="setRange('etf', 90, this)">3M</button>
-        <button class="range-btn" onclick="setRange('etf', 180, this)">6M</button>
-        <button class="range-btn" onclick="setRange('etf', 365, this)">1Y</button>
-        <button class="range-btn active" onclick="setRange('etf', null, this)">ALL</button>
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Market Value vs Invested</div>
+        <div class="range-btns" id="etf-range-btns">
+          <button class="range-btn" onclick="setRange('etf', 1, this)">1D</button>
+          <button class="range-btn" onclick="setRange('etf', 7, this)">1W</button>
+          <button class="range-btn" onclick="setRange('etf', 30, this)">1M</button>
+          <button class="range-btn" onclick="setRange('etf', 90, this)">3M</button>
+          <button class="range-btn" onclick="setRange('etf', 180, this)">6M</button>
+          <button class="range-btn" onclick="setRange('etf', 365, this)">1Y</button>
+          <button class="range-btn active" onclick="setRange('etf', null, this)">ALL</button>
+        </div>
       </div>
+      <div id="etf-loading" class="loading">LOADING DATA...</div>
+      <canvas id="etf-chart" style="display:none"></canvas>
     </div>
-    <div id="etf-loading" class="loading">LOADING DATA...</div>
-    <canvas id="etf-chart" style="display:none"></canvas>
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Invested vs Return (incl. dividends)</div>
+      </div>
+      <div id="etf-totals-loading" class="loading">LOADING DATA...</div>
+      <canvas id="etf-totals-chart" style="display:none"></canvas>
+    </div>
   </div>
   <div class="chart-card">
     <div class="chart-toolbar">
@@ -794,6 +819,68 @@
     });
   }
 
+  // Whole-ETF-portfolio snapshot: total Invested vs total Return as two bars.
+  let etfTotalsChart = null;
+  function buildEtfTotals(totals) {
+    const loading = document.getElementById('etf-totals-loading');
+    const canvas  = document.getElementById('etf-totals-chart');
+    if (!totals) { loading.textContent = 'NO ETF DATA'; return; }
+
+    loading.style.display = 'none';
+    canvas.style.display = 'block';
+
+    const ctx = canvas.getContext('2d');
+    if (etfTotalsChart) etfTotalsChart.destroy();
+
+    const retColor = totals.ret >= 0 ? '#2dd4a0' : '#f7605a';
+
+    etfTotalsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Invested', 'Return'],
+        datasets: [{
+          data: [totals.invested, totals.ret],
+          backgroundColor: ['#4f8ef7', retColor],
+          borderRadius: 6,
+          maxBarThickness: 110
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e2330',
+            titleColor: '#7c82a0',
+            bodyColor: '#e8eaf2',
+            borderColor: '#2a3045',
+            borderWidth: 1,
+            titleFont: { family: 'DM Mono', size: 11 },
+            bodyFont: { family: 'DM Mono', size: 12 },
+            padding: 12,
+            callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y) }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#4a5068', font: { family: 'DM Mono', size: 10 } },
+            grid: { color: 'transparent' },
+            border: { color: '#1e2330' }
+          },
+          y: {
+            ticks: {
+              color: '#4a5068',
+              font: { family: 'DM Mono', size: 10 },
+              callback: v => '€' + v.toLocaleString('en-IE', { maximumFractionDigits: 0 })
+            },
+            grid: { color: '#1a1e2a' },
+            border: { color: 'transparent' }
+          }
+        }
+      }
+    });
+  }
+
   function setRange(type, days, btn) {
     const parent = btn.closest('.range-btns');
     parent.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
@@ -982,6 +1069,10 @@
   google.script.run.withSuccessHandler(rows => initPanel('etf', rows))
     .withFailureHandler(e => document.getElementById('etf-loading').textContent = 'ERROR: ' + e.message)
     .getChartData();
+
+  google.script.run.withSuccessHandler(buildEtfTotals)
+    .withFailureHandler(e => document.getElementById('etf-totals-loading').textContent = 'ERROR: ' + e.message)
+    .getEtfTotals();
 
   google.script.run.withSuccessHandler(rows => initPanel('stocks', rows))
     .withFailureHandler(e => document.getElementById('stocks-loading').textContent = 'ERROR: ' + e.message)

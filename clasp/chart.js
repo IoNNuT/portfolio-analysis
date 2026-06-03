@@ -26,6 +26,46 @@ function getChartData() {
   }));
 }
 
+// Aggregate Invested vs Total Return (incl. dividends) across the whole ETF
+// portfolio, for the ETF tab's bar chart. Reads the ETFs table from the
+// "Summary" sheet — located by the header row containing both "Invested" and
+// "TTL Return ABS (with dividends)" — and sums those two columns over the
+// holding rows, stopping at the first blank or "Total" row so a footer total
+// isn't double-counted. Returns { invested, ret } in €, or null if not found.
+function getEtfTotals() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Summary");
+  if (!sheet) return null;
+
+  const disp = sheet.getDataRange().getDisplayValues();
+
+  let headerRow = -1, idxInv = -1, idxRet = -1;
+  for (let i = 0; i < disp.length; i++) {
+    const inv = disp[i].indexOf("Invested");
+    const ret = disp[i].indexOf("TTL Return ABS (with dividends)");
+    if (inv !== -1 && ret !== -1) {
+      headerRow = i; idxInv = inv; idxRet = ret;
+      break;
+    }
+  }
+  if (headerRow === -1) return null;
+
+  const num = v => {
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+
+  let invested = 0, ret = 0;
+  for (let i = headerRow + 1; i < disp.length; i++) {
+    if (!(disp[i][idxInv] || "").trim()) break;        // blank Invested = table end
+    if (disp[i].some(c => /total/i.test(c))) break;    // footer total row
+    invested += num(disp[i][idxInv]);
+    ret      += num(disp[i][idxRet]);
+  }
+
+  return { invested: invested, ret: ret };
+}
+
 function getStocksData() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const sheet   = ss.getSheetByName("Stocks History");
