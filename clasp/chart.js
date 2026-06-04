@@ -131,6 +131,7 @@ function getStockHoldings() {
       ticker:       ticker,
       price:        (disp[i][col["Price"]]         || "").trim(),
       weeklyChange: (disp[i][col["Weekly Change"]] || "").trim(),
+      costBasis:    (disp[i][col["Cost Basis"]]    || "").trim(),
       shares:       (disp[i][col["Shares"]]        || "").trim(),
       mv:           (disp[i][col["MV"]]            || "").trim(),
       pnlAbs:       (disp[i][col["P&L (Abs)"]]     || "").trim(),
@@ -139,21 +140,79 @@ function getStockHoldings() {
     });
   }
 
-  const dailyMap = _fetchDailyChanges_(holdings.map(h => h.ticker));
-  holdings.forEach(h => { h.dailyChange = dailyMap[h.ticker]; });
+  const changes = _fetchPriceChanges_(holdings.map(h => h.ticker));
+  holdings.forEach(h => { h.dailyChange = (changes[h.ticker] || {}).daily; });
 
   return holdings;
 }
 
-// Returns { ticker: dailyChangeFraction|null }, e.g. { PTCT: 0.0394 }.
-// Computed as (latest price − previous trading day's close) / previous close.
-function _fetchDailyChanges_(tickers) {
+// Per-ticker ETF holdings for the dashboard table.
+// Reads the ETF table from the "Summary" sheet — the header row with "Ticker"
+// and "Cost Basis" but NO "Weekly Change" (the latter marks the Stocks table)
+// and an "MV" column (distinguishes it from the bonds table further down). The
+// ETF table sits at the top of the sheet, so the first match is the right one.
+// The sheet stores neither a daily nor a weekly change for ETFs, so both are
+// computed live from Yahoo Finance (these are all .DE-listed tickers).
+function getEtfHoldings() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Summary");
+  if (!sheet) return [];
+
+  const disp = sheet.getDataRange().getDisplayValues();
+
+  let headerRow = -1;
+  const col = {};
+  for (let i = 0; i < disp.length; i++) {
+    const row = disp[i];
+    const has = name => row.indexOf(name) !== -1;
+    if (has("Ticker") && has("Cost Basis") && has("MV") && !has("Weekly Change")) {
+      headerRow = i;
+      row.forEach((h, j) => { const k = h.trim(); if (col[k] === undefined) col[k] = j; });
+      break;
+    }
+  }
+  if (headerRow === -1) return [];
+
+  const idxTicker = col["Ticker"];
+  const holdings = [];
+  for (let i = headerRow + 1; i < disp.length; i++) {
+    const ticker = (disp[i][idxTicker] || "").trim();
+    if (!ticker) break;  // blank ticker = footer/total row → table ends
+    holdings.push({
+      ticker:       ticker,
+      price:        (disp[i][col["Price"]]      || "").trim(),
+      costBasis:    (disp[i][col["Cost Basis"]] || "").trim(),
+      shares:       (disp[i][col["Shares"]]     || "").trim(),
+      mv:           (disp[i][col["MV"]]         || "").trim(),
+      pnlAbs:       (disp[i][col["P&L (Abs)"]]  || "").trim(),
+      pnlPct:       (disp[i][col["P&L (%)"]]    || "").trim(),
+      dailyChange:  null,
+      weeklyChange: null
+    });
+  }
+
+  const changes = _fetchPriceChanges_(holdings.map(h => h.ticker));
+  holdings.forEach(h => {
+    const c = changes[h.ticker] || {};
+    h.dailyChange  = c.daily  != null ? c.daily  : null;
+    h.weeklyChange = c.weekly != null ? c.weekly : null;
+  });
+
+  return holdings;
+}
+
+// Returns { ticker: { daily, weekly } } as fractions (e.g. 0.0394 → +3.94%),
+// each null when unavailable. Daily = (latest − previous trading day's close) /
+// previous close. Weekly = (latest − last close at or before 7 calendar days
+// ago) / that close. One month of daily candles is fetched so the ~7-day-ago
+// reference is always present.
+function _fetchPriceChanges_(tickers) {
   const out = {};
   if (!tickers.length) return out;
 
   const requests = tickers.map(t => ({
     url: "https://query1.finance.yahoo.com/v8/finance/chart/" +
-         encodeURIComponent(t) + "?interval=1d&range=5d",
+         encodeURIComponent(t) + "?interval=1d&range=1mo",
     headers: { "User-Agent": "Mozilla/5.0 (compatible; GAS/1.0)" },
     muteHttpExceptions: true
   }));
@@ -162,26 +221,48 @@ function _fetchDailyChanges_(tickers) {
   try {
     responses = UrlFetchApp.fetchAll(requests);
   } catch (e) {
-    Logger.log("_fetchDailyChanges_ error: " + e);
+    Logger.log("_fetchPriceChanges_ error: " + e);
     return out;
   }
 
   responses.forEach((resp, i) => {
     const t = tickers[i];
-    out[t] = null;
+    out[t] = { daily: null, weekly: null };
     try {
       if (resp.getResponseCode() !== 200) return;
-      const result = JSON.parse(resp.getContentText()).chart.result[0];
-      const closes = (result.indicators.quote[0].close || []).filter(c => c != null);
-      const last   = result.meta.regularMarketPrice != null
-        ? result.meta.regularMarketPrice
-        : closes[closes.length - 1];
-      const prev   = closes[closes.length - 2];
-      if (last != null && prev != null && prev !== 0) {
-        out[t] = (last - prev) / prev;
+      const result   = JSON.parse(resp.getContentText()).chart.result[0];
+      const ts       = result.timestamp || [];
+      const rawClose = result.indicators.quote[0].close || [];
+
+      // Pair timestamps with their non-null closes, in chronological order.
+      const series = [];
+      for (let k = 0; k < rawClose.length; k++) {
+        if (rawClose[k] != null && ts[k] != null) series.push({ t: ts[k], c: rawClose[k] });
       }
+      if (!series.length) return;
+
+      const last = result.meta.regularMarketPrice != null
+        ? result.meta.regularMarketPrice
+        : series[series.length - 1].c;
+      const lastTs = result.meta.regularMarketTime != null
+        ? result.meta.regularMarketTime
+        : series[series.length - 1].t;
+
+      // Daily: vs the previous trading day's close.
+      const prev = series.length >= 2 ? series[series.length - 2].c : null;
+      if (last != null && prev != null && prev !== 0) out[t].daily = (last - prev) / prev;
+
+      // Weekly: vs the latest close at or before 7 calendar days ago; if the
+      // history doesn't reach back that far, fall back to the earliest close.
+      const weekAgo = lastTs - 7 * 86400;
+      let ref = null;
+      for (let k = series.length - 1; k >= 0; k--) {
+        if (series[k].t <= weekAgo) { ref = series[k].c; break; }
+      }
+      if (ref == null) ref = series[0].c;
+      if (last != null && ref != null && ref !== 0) out[t].weekly = (last - ref) / ref;
     } catch (e) {
-      Logger.log("_fetchDailyChanges_ parse error for " + t + ": " + e);
+      Logger.log("_fetchPriceChanges_ parse error for " + t + ": " + e);
     }
   });
 

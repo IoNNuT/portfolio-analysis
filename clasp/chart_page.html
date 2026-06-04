@@ -316,6 +316,28 @@
 
 <!-- ETF PANEL -->
 <div class="panel active" id="panel-etf">
+  <div class="stats-label">HOLDINGS</div>
+  <div class="holdings-card">
+    <div id="etf-holdings-loading" class="loading">LOADING HOLDINGS...</div>
+    <div class="table-wrap" id="etf-holdings-wrap" style="display:none">
+      <table class="holdings" id="etf-holdings-table">
+        <thead>
+          <tr id="etf-holdings-head">
+            <th data-key="ticker"       data-type="str">Ticker</th>
+            <th data-key="price"        data-type="num" class="num">Price</th>
+            <th data-key="dailyChange"  data-type="num" class="num">Day</th>
+            <th data-key="weeklyChange" data-type="num" class="num">Week</th>
+            <th data-key="mv"           data-type="num" class="num">Mkt Value</th>
+            <th data-key="costBasis"    data-type="num" class="num">Cost Basis</th>
+            <th data-key="shares"       data-type="num" class="num">Shares</th>
+            <th data-key="pnlPct"       data-type="num" class="num">P&amp;L %</th>
+            <th data-key="pnlAbs"       data-type="num" class="num">P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
   <div class="stats-label">LATEST SNAPSHOT</div>
   <div class="stats">
     <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="etf-mv">—</div></div>
@@ -387,12 +409,13 @@
           <tr id="holdings-head">
             <th data-key="ticker"       data-type="str">Ticker</th>
             <th data-key="price"        data-type="num" class="num">Price</th>
-            <th data-key="mv"           data-type="num" class="num">Mkt Value</th>
             <th data-key="dailyChange"  data-type="num" class="num">Day</th>
             <th data-key="weeklyChange" data-type="num" class="num">Week</th>
+            <th data-key="mv"           data-type="num" class="num">Mkt Value</th>
+            <th data-key="costBasis"    data-type="num" class="num">Cost Basis</th>
             <th data-key="shares"       data-type="num" class="num">Shares</th>
-            <th data-key="pnlAbs"       data-type="num" class="num">P&amp;L</th>
             <th data-key="pnlPct"       data-type="num" class="num">P&amp;L %</th>
+            <th data-key="pnlAbs"       data-type="num" class="num">P&amp;L</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -969,10 +992,6 @@
     return td;
   }
 
-  let holdingsRows = [];
-  let holdingsWired = false;
-  const holdingsSort = { key: null, dir: 1 };
-
   // Pull a comparable number out of a display string ("$1,036.84", "-1.46%", 0.0394).
   function holdingsNum(v) {
     if (v === null || v === undefined || v === '') return NaN;
@@ -981,89 +1000,128 @@
     return isNaN(n) ? NaN : n;
   }
 
-  function drawHoldings(rows) {
-    const tbody = document.querySelector('#holdings-table tbody');
-    tbody.innerHTML = '';
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.appendChild(holdingsTickerCell(r.ticker));
-      tr.appendChild(holdingsCell(r.price, 'num'));
-      tr.appendChild(holdingsCell(r.mv, 'num'));
-      tr.appendChild(holdingsPctCell(r.dailyChange));
-      tr.appendChild(holdingsSignedCell(r.weeklyChange));
-      tr.appendChild(holdingsCell(r.shares, 'num'));
-      tr.appendChild(holdingsSignedCell(r.pnlAbs));
-      tr.appendChild(holdingsSignedCell(r.pnlPct));
-      tbody.appendChild(tr);
-    });
-  }
+  // A self-contained, sortable holdings table. `cfg.ids` names the DOM nodes;
+  // `cfg.cells(r)` returns the <td> list for a row, in column order (so each
+  // table owns its own ordering and per-cell rendering). Sorting is driven by
+  // the `data-key` / `data-type` on the table's <th>s.
+  function createHoldingsTable(cfg) {
+    let rowsData = [];
+    let wired    = false;
+    const sort   = { key: null, dir: 1 };
+    const headSel = '#' + cfg.ids.head + ' th';
 
-  function sortAndDraw() {
-    const key  = holdingsSort.key;
-    const dir  = holdingsSort.dir;
-    const rows = holdingsRows.slice();
-    if (key) {
-      const th   = document.querySelector('#holdings-head th[data-key="' + key + '"]');
-      const type = th ? th.dataset.type : 'num';
-      rows.sort((a, b) => {
-        if (type === 'str') {
-          const av = (a[key] || '').toUpperCase(), bv = (b[key] || '').toUpperCase();
-          return av < bv ? -dir : av > bv ? dir : 0;
-        }
-        const av = holdingsNum(a[key]), bv = holdingsNum(b[key]);
-        if (isNaN(av) && isNaN(bv)) return 0;
-        if (isNaN(av)) return 1;          // blanks sort last regardless of dir
-        if (isNaN(bv)) return -1;
-        return (av - bv) * dir;
+    function draw(rows) {
+      const tbody = document.querySelector('#' + cfg.ids.table + ' tbody');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        cfg.cells(r).forEach(td => tr.appendChild(td));
+        tbody.appendChild(tr);
       });
     }
-    drawHoldings(rows);
-    updateSortArrows();
-  }
 
-  function updateSortArrows() {
-    document.querySelectorAll('#holdings-head th').forEach(th => {
-      th.textContent = th.dataset.label;
-      if (th.dataset.key === holdingsSort.key) {
-        const arrow = document.createElement('span');
-        arrow.className = 'arrow';
-        arrow.textContent = holdingsSort.dir === 1 ? '▲' : '▼';
-        th.appendChild(arrow);
+    function sortAndDraw() {
+      const rows = rowsData.slice();
+      if (sort.key) {
+        const th   = document.querySelector(headSel + '[data-key="' + sort.key + '"]');
+        const type = th ? th.dataset.type : 'num';
+        rows.sort((a, b) => {
+          if (type === 'str') {
+            const av = (a[sort.key] || '').toUpperCase(), bv = (b[sort.key] || '').toUpperCase();
+            return av < bv ? -sort.dir : av > bv ? sort.dir : 0;
+          }
+          const av = holdingsNum(a[sort.key]), bv = holdingsNum(b[sort.key]);
+          if (isNaN(av) && isNaN(bv)) return 0;
+          if (isNaN(av)) return 1;          // blanks sort last regardless of dir
+          if (isNaN(bv)) return -1;
+          return (av - bv) * sort.dir;
+        });
       }
-    });
-  }
+      draw(rows);
+      updateArrows();
+    }
 
-  function wireHoldingsHeader() {
-    if (holdingsWired) return;
-    holdingsWired = true;
-    document.querySelectorAll('#holdings-head th').forEach(th => {
-      th.dataset.label = th.textContent;   // base label, before any arrow
-      th.addEventListener('click', () => {
-        const key = th.dataset.key;
-        if (holdingsSort.key === key) holdingsSort.dir *= -1;
-        else { holdingsSort.key = key; holdingsSort.dir = 1; }
-        sortAndDraw();
+    function updateArrows() {
+      document.querySelectorAll(headSel).forEach(th => {
+        th.textContent = th.dataset.label;
+        if (th.dataset.key === sort.key) {
+          const arrow = document.createElement('span');
+          arrow.className = 'arrow';
+          arrow.textContent = sort.dir === 1 ? '▲' : '▼';
+          th.appendChild(arrow);
+        }
       });
-    });
+    }
+
+    function wireHeader() {
+      if (wired) return;
+      wired = true;
+      document.querySelectorAll(headSel).forEach(th => {
+        th.dataset.label = th.textContent;   // base label, before any arrow
+        th.addEventListener('click', () => {
+          const key = th.dataset.key;
+          if (sort.key === key) sort.dir *= -1;
+          else { sort.key = key; sort.dir = 1; }
+          sortAndDraw();
+        });
+      });
+    }
+
+    function render(rows) {
+      const loading = document.getElementById(cfg.ids.loading);
+      const wrap    = document.getElementById(cfg.ids.wrap);
+      if (!rows || !rows.length) { loading.textContent = 'NO HOLDINGS DATA'; return; }
+      rowsData = rows;
+      wireHeader();
+      sortAndDraw();
+      loading.style.display = 'none';
+      wrap.style.display = 'block';
+    }
+
+    return { render };
   }
 
-  function renderHoldings(rows) {
-    const loading = document.getElementById('holdings-loading');
-    const wrap    = document.getElementById('holdings-wrap');
-    if (!rows || !rows.length) { loading.textContent = 'NO HOLDINGS DATA'; return; }
+  // Stocks: Week comes from the sheet as a display string; Day is a live fraction.
+  const stocksHoldings = createHoldingsTable({
+    ids: { table: 'holdings-table', head: 'holdings-head', loading: 'holdings-loading', wrap: 'holdings-wrap' },
+    cells: r => [
+      holdingsTickerCell(r.ticker),
+      holdingsCell(r.price, 'num'),
+      holdingsPctCell(r.dailyChange),
+      holdingsSignedCell(r.weeklyChange),
+      holdingsCell(r.mv, 'num'),
+      holdingsCell(r.costBasis, 'num'),
+      holdingsCell(r.shares, 'num'),
+      holdingsSignedCell(r.pnlPct),
+      holdingsSignedCell(r.pnlAbs),
+    ]
+  });
 
-    holdingsRows = rows;
-    wireHoldingsHeader();
-    sortAndDraw();
-
-    loading.style.display = 'none';
-    wrap.style.display = 'block';
-  }
+  // ETF: both Day and Week are live fractions computed from Yahoo Finance.
+  const etfHoldings = createHoldingsTable({
+    ids: { table: 'etf-holdings-table', head: 'etf-holdings-head', loading: 'etf-holdings-loading', wrap: 'etf-holdings-wrap' },
+    cells: r => [
+      holdingsTickerCell(r.ticker),
+      holdingsCell(r.price, 'num'),
+      holdingsPctCell(r.dailyChange),
+      holdingsPctCell(r.weeklyChange),
+      holdingsCell(r.mv, 'num'),
+      holdingsCell(r.costBasis, 'num'),
+      holdingsCell(r.shares, 'num'),
+      holdingsSignedCell(r.pnlPct),
+      holdingsSignedCell(r.pnlAbs),
+    ]
+  });
 
   google.script.run
-    .withSuccessHandler(renderHoldings)
+    .withSuccessHandler(rows => stocksHoldings.render(rows))
     .withFailureHandler(e => document.getElementById('holdings-loading').textContent = 'ERROR: ' + e.message)
     .getStockHoldings();
+
+  google.script.run
+    .withSuccessHandler(rows => etfHoldings.render(rows))
+    .withFailureHandler(e => document.getElementById('etf-holdings-loading').textContent = 'ERROR: ' + e.message)
+    .getEtfHoldings();
 
   // Load all three in parallel
   google.script.run.withSuccessHandler(rows => initPanel('etf', rows))

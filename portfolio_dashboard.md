@@ -88,6 +88,14 @@ Three tabs, one per investment category:
 - **Stocks** — reads from Stocks History
 - **Net Worth** — reads from NetWorth History
 
+### Holdings Tables
+
+Both the **ETF** and **Stocks** tabs show a sortable per-holding table read live from the Summary sheet, columns in order: Ticker · Price · Day · Week · Mkt Value · Cost Basis · Shares · P&L % · P&L. Click any header to sort.
+
+- **Day** and **Week** are percentage changes computed live from Yahoo Finance (`_fetchPriceChanges_` in `chart.js`): Day vs the previous trading day's close, Week vs the last close at/before 7 calendar days ago.
+- Stocks override **Week** with the sheet's own "Weekly Change" column (kept as-is); ETFs have no such column, so both Day and Week are computed.
+- Cost Basis is the average price paid per share, read straight from the Summary sheet.
+
 ### Stats Panels
 
 **Latest Snapshot** (always shows most recent recorded values)
