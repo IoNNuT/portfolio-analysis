@@ -223,6 +223,33 @@
   .range-btn:hover { border-color: var(--blue); color: var(--blue); }
   .range-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
+  /* Right side of each chart toolbar: range buttons + fullscreen toggle. */
+  .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .icon-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    line-height: 1;
+    padding: 5px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--subtext);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .icon-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* Sized, relatively-positioned box so charts can fill it (maintainAspectRatio:false). */
+  .chart-box { position: relative; height: 320px; }
+  .chart-box .loading { height: 100%; }
+
+  /* Native fullscreen: card fills the screen, chart grows to fill remaining space. */
+  .chart-card:fullscreen { background: var(--bg); padding: 28px 32px; display: flex; flex-direction: column; }
+  .chart-card:fullscreen .chart-toolbar { flex: 0 0 auto; }
+  .chart-card:fullscreen .chart-box { flex: 1 1 auto; height: auto; min-height: 0; }
+  .chart-card:fullscreen .icon-btn { border-color: var(--blue); color: var(--blue); }
+
   .hint {
     font-family: 'DM Mono', monospace;
     font-size: 10px;
@@ -355,33 +382,57 @@
     <div class="chart-card">
       <div class="chart-toolbar">
         <div class="chart-title">Market Value vs Invested</div>
-        <div class="range-btns" id="etf-range-btns">
-          <button class="range-btn" onclick="setRange('etf', 1, this)">1D</button>
-          <button class="range-btn" onclick="setRange('etf', 7, this)">1W</button>
-          <button class="range-btn" onclick="setRange('etf', 30, this)">1M</button>
-          <button class="range-btn" onclick="setRange('etf', 90, this)">3M</button>
-          <button class="range-btn" onclick="setRange('etf', 180, this)">6M</button>
-          <button class="range-btn" onclick="setRange('etf', 365, this)">1Y</button>
-          <button class="range-btn active" onclick="setRange('etf', null, this)">ALL</button>
+        <div class="toolbar-right">
+          <div class="range-btns">
+            <button class="range-btn" onclick="setRange('etf-main', 1, this)">1D</button>
+            <button class="range-btn" onclick="setRange('etf-main', 7, this)">1W</button>
+            <button class="range-btn" onclick="setRange('etf-main', 30, this)">1M</button>
+            <button class="range-btn" onclick="setRange('etf-main', 90, this)">3M</button>
+            <button class="range-btn" onclick="setRange('etf-main', 180, this)">6M</button>
+            <button class="range-btn" onclick="setRange('etf-main', 365, this)">1Y</button>
+            <button class="range-btn active" onclick="setRange('etf-main', null, this)">ALL</button>
+          </div>
+          <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
         </div>
       </div>
-      <div id="etf-loading" class="loading">LOADING DATA...</div>
-      <canvas id="etf-chart" style="display:none"></canvas>
+      <div class="chart-box">
+        <div id="etf-loading" class="loading">LOADING DATA...</div>
+        <canvas id="etf-chart" style="display:none"></canvas>
+      </div>
     </div>
     <div class="chart-card">
       <div class="chart-toolbar">
         <div class="chart-title">Invested vs Return (incl. dividends)</div>
+        <div class="toolbar-right">
+          <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+        </div>
       </div>
-      <div id="etf-totals-loading" class="loading">LOADING DATA...</div>
-      <canvas id="etf-totals-chart" style="display:none"></canvas>
+      <div class="chart-box">
+        <div id="etf-totals-loading" class="loading">LOADING DATA...</div>
+        <canvas id="etf-totals-chart" style="display:none"></canvas>
+      </div>
     </div>
   </div>
   <div class="chart-card">
     <div class="chart-toolbar">
       <div class="chart-title">Portfolio vs S&P 500 — Normalized Return</div>
+      <div class="toolbar-right">
+        <div class="range-btns">
+          <button class="range-btn" onclick="setRange('etf-cmp', 1, this)">1D</button>
+          <button class="range-btn" onclick="setRange('etf-cmp', 7, this)">1W</button>
+          <button class="range-btn" onclick="setRange('etf-cmp', 30, this)">1M</button>
+          <button class="range-btn" onclick="setRange('etf-cmp', 90, this)">3M</button>
+          <button class="range-btn" onclick="setRange('etf-cmp', 180, this)">6M</button>
+          <button class="range-btn" onclick="setRange('etf-cmp', 365, this)">1Y</button>
+          <button class="range-btn active" onclick="setRange('etf-cmp', null, this)">ALL</button>
+        </div>
+        <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+      </div>
     </div>
-    <div id="etf-cmp-loading" class="loading">LOADING DATA...</div>
-    <canvas id="etf-cmp-chart" style="display:none"></canvas>
+    <div class="chart-box">
+      <div id="etf-cmp-loading" class="loading">LOADING DATA...</div>
+      <canvas id="etf-cmp-chart" style="display:none"></canvas>
+    </div>
   </div>
 </div>
 
@@ -425,25 +476,44 @@
   <div class="chart-card">
     <div class="chart-toolbar">
       <div class="chart-title">Market Value vs Invested</div>
-      <div class="range-btns">
-        <button class="range-btn" onclick="setRange('stocks', 1, this)">1D</button>
-        <button class="range-btn" onclick="setRange('stocks', 7, this)">1W</button>
-        <button class="range-btn" onclick="setRange('stocks', 30, this)">1M</button>
-        <button class="range-btn" onclick="setRange('stocks', 90, this)">3M</button>
-        <button class="range-btn" onclick="setRange('stocks', 180, this)">6M</button>
-        <button class="range-btn" onclick="setRange('stocks', 365, this)">1Y</button>
-        <button class="range-btn active" onclick="setRange('stocks', null, this)">ALL</button>
+      <div class="toolbar-right">
+        <div class="range-btns">
+          <button class="range-btn" onclick="setRange('stocks-main', 1, this)">1D</button>
+          <button class="range-btn" onclick="setRange('stocks-main', 7, this)">1W</button>
+          <button class="range-btn" onclick="setRange('stocks-main', 30, this)">1M</button>
+          <button class="range-btn" onclick="setRange('stocks-main', 90, this)">3M</button>
+          <button class="range-btn" onclick="setRange('stocks-main', 180, this)">6M</button>
+          <button class="range-btn" onclick="setRange('stocks-main', 365, this)">1Y</button>
+          <button class="range-btn active" onclick="setRange('stocks-main', null, this)">ALL</button>
+        </div>
+        <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
       </div>
     </div>
-    <div id="stocks-loading" class="loading">LOADING DATA...</div>
-    <canvas id="stocks-chart" style="display:none"></canvas>
+    <div class="chart-box">
+      <div id="stocks-loading" class="loading">LOADING DATA...</div>
+      <canvas id="stocks-chart" style="display:none"></canvas>
+    </div>
   </div>
   <div class="chart-card">
     <div class="chart-toolbar">
       <div class="chart-title">Portfolio vs S&P 500 — Normalized Return</div>
+      <div class="toolbar-right">
+        <div class="range-btns">
+          <button class="range-btn" onclick="setRange('stocks-cmp', 1, this)">1D</button>
+          <button class="range-btn" onclick="setRange('stocks-cmp', 7, this)">1W</button>
+          <button class="range-btn" onclick="setRange('stocks-cmp', 30, this)">1M</button>
+          <button class="range-btn" onclick="setRange('stocks-cmp', 90, this)">3M</button>
+          <button class="range-btn" onclick="setRange('stocks-cmp', 180, this)">6M</button>
+          <button class="range-btn" onclick="setRange('stocks-cmp', 365, this)">1Y</button>
+          <button class="range-btn active" onclick="setRange('stocks-cmp', null, this)">ALL</button>
+        </div>
+        <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+      </div>
     </div>
-    <div id="stocks-cmp-loading" class="loading">LOADING DATA...</div>
-    <canvas id="stocks-cmp-chart" style="display:none"></canvas>
+    <div class="chart-box">
+      <div id="stocks-cmp-loading" class="loading">LOADING DATA...</div>
+      <canvas id="stocks-cmp-chart" style="display:none"></canvas>
+    </div>
   </div>
 </div>
 
@@ -458,18 +528,23 @@
   <div class="chart-card">
     <div class="chart-toolbar">
       <div class="chart-title">Net Worth Over Time</div>
-      <div class="range-btns">
-        <button class="range-btn" onclick="setRange('nw', 1, this)">1D</button>
-        <button class="range-btn" onclick="setRange('nw', 7, this)">1W</button>
-        <button class="range-btn" onclick="setRange('nw', 30, this)">1M</button>
-        <button class="range-btn" onclick="setRange('nw', 90, this)">3M</button>
-        <button class="range-btn" onclick="setRange('nw', 180, this)">6M</button>
-        <button class="range-btn" onclick="setRange('nw', 365, this)">1Y</button>
-        <button class="range-btn active" onclick="setRange('nw', null, this)">ALL</button>
+      <div class="toolbar-right">
+        <div class="range-btns">
+          <button class="range-btn" onclick="setRange('nw-main', 1, this)">1D</button>
+          <button class="range-btn" onclick="setRange('nw-main', 7, this)">1W</button>
+          <button class="range-btn" onclick="setRange('nw-main', 30, this)">1M</button>
+          <button class="range-btn" onclick="setRange('nw-main', 90, this)">3M</button>
+          <button class="range-btn" onclick="setRange('nw-main', 180, this)">6M</button>
+          <button class="range-btn" onclick="setRange('nw-main', 365, this)">1Y</button>
+          <button class="range-btn active" onclick="setRange('nw-main', null, this)">ALL</button>
+        </div>
+        <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
       </div>
     </div>
-    <div id="nw-loading" class="loading">LOADING DATA...</div>
-    <canvas id="nw-chart" style="display:none"></canvas>
+    <div class="chart-box">
+      <div id="nw-loading" class="loading">LOADING DATA...</div>
+      <canvas id="nw-chart" style="display:none"></canvas>
+    </div>
   </div>
 </div>
 
@@ -667,6 +742,7 @@
       data: { labels, datasets },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
@@ -790,6 +866,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
@@ -870,6 +947,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -904,38 +982,65 @@
     });
   }
 
-  function setRange(type, days, btn) {
-    const parent = btn.closest('.range-btns');
-    parent.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  // Each rangeable chart maps to a data series and a builder kind, so range
+  // buttons act on one chart only instead of the whole panel.
+  const CHART_DEFS = {
+    'etf-main':    { type: 'etf',    kind: 'main' },
+    'etf-cmp':     { type: 'etf',    kind: 'cmp'  },
+    'stocks-main': { type: 'stocks', kind: 'main' },
+    'stocks-cmp':  { type: 'stocks', kind: 'cmp'  },
+    'nw-main':     { type: 'nw',     kind: 'main' },
+  };
 
-    const all = data[type];
-
-    if (!days) {
-      buildChart(type, all);
-      updatePeriodStats(type, all);
-      if (type !== 'nw') buildComparisonChart(type, all);
-      return;
-    }
-
+  // Slice the full series to the last `days` days (null = everything).
+  function sliceByDays(all, days) {
+    if (!days) return all;
     if (days === 1) {
       const slice = all.slice(-2);
-      const d = slice.length > 1 ? slice : all;
-      buildChart(type, d);
-      updatePeriodStats(type, d);
-      if (type !== 'nw') buildComparisonChart(type, d);
-      return;
+      return slice.length > 1 ? slice : all;
     }
-
     const lastDate = new Date(all[all.length - 1].date);
     const cutoff   = new Date(lastDate);
     cutoff.setDate(cutoff.getDate() - days);
     const filtered = all.filter(d => new Date(d.date) >= cutoff);
-    const d = filtered.length > 1 ? filtered : all;
-    buildChart(type, d);
-    updatePeriodStats(type, d);
-    if (type !== 'nw') buildComparisonChart(type, d);
+    return filtered.length > 1 ? filtered : all;
   }
+
+  function setRange(chartKey, days, btn) {
+    const group = btn.closest('.range-btns');
+    group.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const def = CHART_DEFS[chartKey];
+    const rows = sliceByDays(data[def.type], days);
+
+    if (def.kind === 'cmp') {
+      buildComparisonChart(def.type, rows);
+    } else {
+      buildChart(def.type, rows);
+      // The main MV-vs-Invested chart drives the panel's period stats.
+      updatePeriodStats(def.type, rows);
+    }
+  }
+
+  // ── FULLSCREEN ──────────────────────────────────────────────────────────
+  function toggleFullscreen(btn) {
+    const card = btn.closest('.chart-card');
+    if (!document.fullscreenElement) {
+      (card.requestFullscreen || card.webkitRequestFullscreen)?.call(card);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    }
+  }
+
+  // Resize every chart when entering/leaving fullscreen so the active one fills.
+  function resizeAllCharts() {
+    Object.values(charts).forEach(c => c && c.resize());
+    Object.values(compCharts).forEach(c => c && c.resize());
+    if (etfTotalsChart) etfTotalsChart.resize();
+  }
+  document.addEventListener('fullscreenchange', resizeAllCharts);
+  document.addEventListener('webkitfullscreenchange', resizeAllCharts);
 
   function initPanel(type, rows) {
     const loadingId = type + '-loading';
