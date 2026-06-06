@@ -201,6 +201,87 @@ function getEtfHoldings() {
   return holdings;
 }
 
+// Romania portfolio for the dashboard's Romania page: the single-line BET ETF
+// table and the government-bonds table, both read from the "Summary" sheet.
+// Values are kept as the sheet's display strings (RON / € symbols preserved),
+// like the other holdings tables — the BET holding is RON-denominated and the
+// bonds are EUR-denominated, so no currency conversion is attempted.
+//
+// The BET table is the header row with "Ticker" + "Weighting" but no
+// "Target Weight" / "Weekly Change" / "SCADENTA" (those mark the ETF, Stocks
+// and bonds tables respectively). The bonds table is the header row carrying
+// the Romanian "SCADENTA" (maturity) column; its "Cost Basis" header cell is
+// wrapped in literal quote characters in the sheet, so column keys are stripped
+// of surrounding quotes before matching. Returns { bet, bonds }.
+function getRomaniaHoldings() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Summary");
+  if (!sheet) return { bet: null, bonds: [] };
+
+  const disp   = sheet.getDataRange().getDisplayValues();
+  const has    = (row, name) => row.indexOf(name) !== -1;
+  const keyOf  = h => h.trim().replace(/^"+|"+$/g, "");
+  const colMap = row => {
+    const col = {};
+    row.forEach((h, j) => { const k = keyOf(h); if (col[k] === undefined) col[k] = j; });
+    return col;
+  };
+
+  let bet = null;
+  const bonds = [];
+
+  // ── BET ETF table (single holding) ──
+  for (let i = 0; i < disp.length; i++) {
+    const row = disp[i];
+    if (has(row, "Ticker") && has(row, "Weighting") &&
+        !has(row, "Target Weight") && !has(row, "Weekly Change") && !has(row, "SCADENTA")) {
+      const col = colMap(row);
+      const t   = (disp[i + 1] && (disp[i + 1][col["Ticker"]] || "").trim()) || "";
+      if (t) {
+        const r = disp[i + 1];
+        bet = {
+          ticker:    t,
+          price:     (r[col["Price"]]      || "").trim(),
+          costBasis: (r[col["Cost Basis"]] || "").trim(),
+          shares:    (r[col["Shares"]]     || "").trim(),
+          mv:        (r[col["MV"]]         || "").trim(),
+          invested:  (r[col["Invested"]]   || "").trim(),
+          pnlAbs:    (r[col["P&L (Abs)"]]  || "").trim(),
+          pnlPct:    (r[col["P&L"]]        || "").trim(),
+          weighting: (r[col["Weighting"]]  || "").trim()
+        };
+      }
+      break;
+    }
+  }
+
+  // ── Government bonds table ──
+  for (let i = 0; i < disp.length; i++) {
+    if (has(disp[i], "Ticker") && has(disp[i], "SCADENTA")) {
+      const col       = colMap(disp[i]);
+      const idxTicker = col["Ticker"];
+      for (let k = i + 1; k < disp.length; k++) {
+        const ticker = (disp[k][idxTicker] || "").trim();
+        if (!ticker) break;   // blank ticker = totals/footer row → table ends
+        bonds.push({
+          ticker:    ticker,
+          price:     (disp[k][col["Price"]]          || "").trim(),
+          costBasis: (disp[k][col["Cost Basis"]]     || "").trim(),
+          shares:    (disp[k][col["Shares"]]         || "").trim(),
+          invested:  (disp[k][col["Invested"]]       || "").trim(),
+          returnPct: (disp[k][col["RETURN %"]]       || "").trim(),
+          returnAbs: (disp[k][col["RETURN ABS"]]     || "").trim(),
+          maturity:  (disp[k][col["SCADENTA"]]       || "").trim(),
+          years:     (disp[k][col["PERIOADA (ANI)"]] || "").trim()
+        });
+      }
+      break;
+    }
+  }
+
+  return { bet: bet, bonds: bonds };
+}
+
 // Returns { ticker: { daily, weekly } } as fractions (e.g. 0.0394 → +3.94%),
 // each null when unavailable. Daily = (latest − previous trading day's close) /
 // previous close. Weekly = (latest − last close at or before 7 calendar days

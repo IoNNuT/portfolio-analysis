@@ -338,6 +338,8 @@
   <button class="tab active" onclick="switchTab('overview', this)">Overview</button>
   <button class="tab" onclick="switchTab('etf', this)">ETF</button>
   <button class="tab" onclick="switchTab('stocks', this)">Stocks</button>
+  <button class="tab" onclick="switchTab('romania', this)">Romania</button>
+  <button class="tab" onclick="switchTab('crypto', this)">Crypto</button>
   <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
   <button class="tab" onclick="switchTab('library', this); loadReports()">Library</button>
 </div>
@@ -557,6 +559,75 @@
       <div id="stocks-cmp-loading" class="loading">LOADING DATA...</div>
       <canvas id="stocks-cmp-chart" style="display:none"></canvas>
     </div>
+  </div>
+</div>
+
+<!-- ROMANIA PANEL -->
+<div class="panel" id="panel-romania">
+  <div class="stats-label">BET ETF — LATEST SNAPSHOT</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="ro-bet-mv">—</div></div>
+    <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="ro-bet-inv">—</div></div>
+    <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="ro-bet-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">Return</div><div class="stat-value" id="ro-bet-pct">—</div></div>
+  </div>
+  <div class="stats-label">BET ETF HOLDING</div>
+  <div class="holdings-card">
+    <div id="ro-bet-loading" class="loading">LOADING HOLDINGS...</div>
+    <div class="table-wrap" id="ro-bet-wrap" style="display:none">
+      <table class="holdings" id="ro-bet-table">
+        <thead>
+          <tr id="ro-bet-head">
+            <th data-key="ticker"    data-type="str">Ticker</th>
+            <th data-key="name"      data-type="str">Name</th>
+            <th data-key="price"     data-type="num" class="num">Price</th>
+            <th data-key="shares"    data-type="num" class="num">Shares</th>
+            <th data-key="mv"        data-type="num" class="num">Mkt Value</th>
+            <th data-key="costBasis" data-type="num" class="num">Cost Basis</th>
+            <th data-key="invested"  data-type="num" class="num">Invested</th>
+            <th data-key="pnlPct"    data-type="num" class="num">P&amp;L %</th>
+            <th data-key="pnlAbs"    data-type="num" class="num">P&amp;L</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="stats-label">GOVERNMENT BONDS — SUMMARY</div>
+  <div class="stats three">
+    <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="ro-bond-inv">—</div></div>
+    <div class="stat"><div class="stat-label">Expected Return</div><div class="stat-value" id="ro-bond-ret">—</div></div>
+    <div class="stat"><div class="stat-label">Positions</div><div class="stat-value neutral" id="ro-bond-count">—</div></div>
+  </div>
+  <div class="stats-label">GOVERNMENT BONDS</div>
+  <div class="holdings-card">
+    <div id="ro-bond-loading" class="loading">LOADING BONDS...</div>
+    <div class="table-wrap" id="ro-bond-wrap" style="display:none">
+      <table class="holdings" id="ro-bond-table">
+        <thead>
+          <tr id="ro-bond-head">
+            <th data-key="ticker"    data-type="str">Ticker</th>
+            <th data-key="price"     data-type="num" class="num">Price</th>
+            <th data-key="costBasis" data-type="num" class="num">Cost Basis</th>
+            <th data-key="shares"    data-type="num" class="num">Shares</th>
+            <th data-key="invested"  data-type="num" class="num">Invested</th>
+            <th data-key="returnPct" data-type="num" class="num">Return %</th>
+            <th data-key="returnAbs" data-type="num" class="num">Return</th>
+            <th data-key="maturity"  data-type="str" class="num">Maturity</th>
+            <th data-key="years"     data-type="num" class="num">Years</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CRYPTO PANEL -->
+<div class="panel" id="panel-crypto">
+  <div class="stats-label">CRYPTO</div>
+  <div class="chart-card">
+    <div class="loading" style="height:220px;">NO CRYPTO POSITIONS YET</div>
   </div>
 </div>
 
@@ -1309,6 +1380,86 @@
     .withSuccessHandler(rows => etfHoldings.render(withNames(rows)))
     .withFailureHandler(e => document.getElementById('etf-holdings-loading').textContent = 'ERROR: ' + e.message)
     .getEtfHoldings();
+
+  // ── ROMANIA: BET ETF holding (RON) + government bonds (EUR) ──────────────
+  // BET stats and tables keep the sheet's display strings (currency symbols
+  // intact) since the two parts use different currencies. Bond summary totals
+  // are parsed back to numbers and re-formatted in € (bonds are all EUR).
+  function roSetText(id, str) {
+    document.getElementById(id).textContent = (str && str.trim()) ? str : '—';
+  }
+  // Colour a stat by the sign of its display string ("+€…"/"-…"/"55.80%").
+  function roSignStat(id, str) {
+    const el = document.getElementById(id);
+    const s  = (str || '').trim();
+    el.textContent = s || '—';
+    el.className = 'stat-value ' + (/-/.test(s) ? 'negative' : (/[0-9]/.test(s) ? 'positive' : 'neutral'));
+  }
+
+  const roBetHoldings = createHoldingsTable({
+    ids: { table: 'ro-bet-table', head: 'ro-bet-head', loading: 'ro-bet-loading', wrap: 'ro-bet-wrap' },
+    cells: r => [
+      holdingsTickerCell(r.ticker),
+      holdingsCell(r.name),
+      holdingsCell(r.price, 'num'),
+      holdingsCell(r.shares, 'num'),
+      holdingsCell(r.mv, 'num'),
+      holdingsCell(r.costBasis, 'num'),
+      holdingsCell(r.invested, 'num'),
+      holdingsSignedCell(r.pnlPct),
+      holdingsSignedCell(r.pnlAbs),
+    ]
+  });
+
+  const roBondHoldings = createHoldingsTable({
+    ids: { table: 'ro-bond-table', head: 'ro-bond-head', loading: 'ro-bond-loading', wrap: 'ro-bond-wrap' },
+    cells: r => [
+      holdingsCell(r.ticker),
+      holdingsCell(r.price, 'num'),
+      holdingsCell(r.costBasis, 'num'),
+      holdingsCell(r.shares, 'num'),
+      holdingsCell(r.invested, 'num'),
+      holdingsSignedCell(r.returnPct),
+      holdingsSignedCell(r.returnAbs),
+      holdingsCell(r.maturity, 'num'),
+      holdingsCell(r.years, 'num'),
+    ]
+  });
+
+  function renderRomania(res) {
+    const bet = res && res.bet;
+    if (bet) {
+      roSetText('ro-bet-mv',  bet.mv);
+      roSetText('ro-bet-inv', bet.invested);
+      roSignStat('ro-bet-pnl', bet.pnlAbs);
+      roSignStat('ro-bet-pct', bet.pnlPct);
+      roBetHoldings.render(withNames([bet]));
+    } else {
+      document.getElementById('ro-bet-loading').textContent = 'NO BET DATA';
+    }
+
+    const bonds = (res && res.bonds) || [];
+    if (bonds.length) {
+      const totalInv = bonds.reduce((s, b) => s + (holdingsNum(b.invested)  || 0), 0);
+      const totalRet = bonds.reduce((s, b) => s + (holdingsNum(b.returnAbs) || 0), 0);
+      roSetText('ro-bond-inv', fmt(totalInv));
+      const retEl = document.getElementById('ro-bond-ret');
+      retEl.textContent = sign(totalRet) + fmt(totalRet);
+      retEl.className   = 'stat-value ' + cls(totalRet);
+      roSetText('ro-bond-count', String(bonds.length));
+      roBondHoldings.render(bonds);
+    } else {
+      document.getElementById('ro-bond-loading').textContent = 'NO BONDS DATA';
+    }
+  }
+
+  google.script.run
+    .withSuccessHandler(renderRomania)
+    .withFailureHandler(e => {
+      document.getElementById('ro-bet-loading').textContent  = 'ERROR: ' + e.message;
+      document.getElementById('ro-bond-loading').textContent = 'ERROR: ' + e.message;
+    })
+    .getRomaniaHoldings();
 
   // ── OVERVIEW (main page): total value + breakdown table + allocation pie ──
   const OV_COLORS = ['#4f8ef7', '#a78bfa', '#2dd4a0', '#f7a24f', '#f7605a', '#e8c14f', '#7c82a0'];
