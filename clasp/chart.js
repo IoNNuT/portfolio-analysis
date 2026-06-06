@@ -269,6 +269,55 @@ function _fetchPriceChanges_(tickers) {
   return out;
 }
 
+// Finds a sheet by its gid (sheet id), which survives tab renames — more robust
+// than getSheetByName for the Overview's allocation tab.
+function _sheetByGid_(ss, gid) {
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === gid) return sheets[i];
+  }
+  return null;
+}
+
+// Reads the live "Portfolio Status" allocation tab (gid 1124476629) for the
+// Overview page. Columns: Category | Value | Value EURO. The EURO column carries
+// display strings with currency symbols ("€31,805.05"), so values are regex-
+// stripped to numbers. The sheet's own "Total" row is returned as `total`; the
+// breakdown `rows` excludes it. Zero-value rows (e.g. Crypto) are kept so they
+// still appear in the table. Returns { rows: [{category, value}], total } in €.
+function getPortfolioStatus() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = _sheetByGid_(ss, 1124476629);
+  if (!sheet) return { rows: [], total: 0 };
+
+  const disp = sheet.getDataRange().getDisplayValues();
+  if (disp.length < 2) return { rows: [], total: 0 };
+
+  const norm = c => String(c).replace(/\s+/g, " ").trim().toLowerCase();
+  const num  = v => {
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? 0 : n;
+  };
+
+  const header = disp[0].map(norm);
+  const idxCat = header.indexOf("category");
+  let   idxEur = header.indexOf("value euro");
+  if (idxEur === -1) idxEur = header.indexOf("value eur");
+  if (idxCat === -1 || idxEur === -1) return { rows: [], total: 0 };
+
+  const rows = [];
+  let total = null;
+  for (let i = 1; i < disp.length; i++) {
+    const cat = (disp[i][idxCat] || "").trim();
+    if (!cat) continue;
+    const val = num(disp[i][idxEur]);
+    if (/total/i.test(cat)) { total = val; continue; }
+    rows.push({ category: cat, value: val });
+  }
+  if (total === null) total = rows.reduce((s, r) => s + r.value, 0);
+  return { rows: rows, total: total };
+}
+
 function getNetWorthData() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const sheet   = ss.getSheetByName("NetWorth History");

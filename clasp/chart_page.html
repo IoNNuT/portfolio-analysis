@@ -335,14 +335,55 @@
 
 <!-- TABS -->
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('etf', this)">ETF</button>
+  <button class="tab active" onclick="switchTab('overview', this)">Overview</button>
+  <button class="tab" onclick="switchTab('etf', this)">ETF</button>
   <button class="tab" onclick="switchTab('stocks', this)">Stocks</button>
   <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
   <button class="tab" onclick="switchTab('library', this); loadReports()">Library</button>
 </div>
 
+<!-- OVERVIEW PANEL (main page) -->
+<div class="panel active" id="panel-overview">
+  <div class="stats-label">TOTAL PORTFOLIO VALUE</div>
+  <div class="stat" style="margin-bottom:8px">
+    <div class="stat-label">Total Value (€)</div>
+    <div class="stat-value neutral" id="ov-total" style="font-size:30px">—</div>
+  </div>
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Allocation</div>
+        <div class="toolbar-right">
+          <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div id="ov-loading" class="loading">LOADING DATA...</div>
+        <canvas id="ov-chart" style="display:none"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Breakdown</div>
+      </div>
+      <div class="table-wrap">
+        <table class="holdings" id="ov-table" style="width:100%">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th class="num">Value (€)</th>
+              <th class="num">Weight</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ETF PANEL -->
-<div class="panel active" id="panel-etf">
+<div class="panel" id="panel-etf">
   <div class="stats-label">LATEST SNAPSHOT</div>
   <div class="stats">
     <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="etf-mv">—</div></div>
@@ -1040,6 +1081,7 @@
     Object.values(charts).forEach(c => c && c.resize());
     Object.values(compCharts).forEach(c => c && c.resize());
     if (etfTotalsChart) etfTotalsChart.resize();
+    if (ovChart) ovChart.resize();
   }
   document.addEventListener('fullscreenchange', resizeAllCharts);
   document.addEventListener('webkitfullscreenchange', resizeAllCharts);
@@ -1267,6 +1309,88 @@
     .withSuccessHandler(rows => etfHoldings.render(withNames(rows)))
     .withFailureHandler(e => document.getElementById('etf-holdings-loading').textContent = 'ERROR: ' + e.message)
     .getEtfHoldings();
+
+  // ── OVERVIEW (main page): total value + breakdown table + allocation pie ──
+  const OV_COLORS = ['#4f8ef7', '#a78bfa', '#2dd4a0', '#f7a24f', '#f7605a', '#e8c14f', '#7c82a0'];
+  let ovChart = null;
+
+  function renderOverview(res) {
+    const rows  = (res && res.rows)  || [];
+    const total = (res && res.total) || 0;
+
+    document.getElementById('ov-total').textContent = fmt(total);
+    document.getElementById('updated').textContent  = 'LAST UPDATE ' + new Date().toISOString().split('T')[0];
+
+    // Breakdown table — colour swatch matches the matching pie slice.
+    const tbody = document.querySelector('#ov-table tbody');
+    tbody.innerHTML = '';
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const c1 = document.createElement('td');
+      c1.innerHTML = '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;' +
+        'margin-right:8px;vertical-align:middle;background:' + OV_COLORS[i % OV_COLORS.length] + '"></span>' +
+        r.category;
+      const c2 = document.createElement('td'); c2.className = 'num'; c2.textContent = fmt(r.value);
+      const c3 = document.createElement('td'); c3.className = 'num';
+      c3.textContent = total > 0 ? (r.value / total * 100).toFixed(1) + '%' : '—';
+      tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3);
+      tbody.appendChild(tr);
+    });
+
+    // Allocation doughnut.
+    const loading = document.getElementById('ov-loading');
+    const canvas  = document.getElementById('ov-chart');
+    loading.style.display = 'none';
+    canvas.style.display  = 'block';
+    const ctx = canvas.getContext('2d');
+    if (ovChart) ovChart.destroy();
+
+    ovChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: rows.map(r => r.category),
+        datasets: [{
+          data: rows.map(r => r.value),
+          backgroundColor: rows.map((_, i) => OV_COLORS[i % OV_COLORS.length]),
+          borderColor: '#13161e',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#7c82a0', font: { family: 'DM Mono', size: 11 }, boxWidth: 12, padding: 14 }
+          },
+          tooltip: {
+            backgroundColor: '#1e2330',
+            titleColor: '#7c82a0',
+            bodyColor: '#e8eaf2',
+            borderColor: '#2a3045',
+            borderWidth: 1,
+            titleFont: { family: 'DM Mono', size: 11 },
+            bodyFont: { family: 'DM Mono', size: 12 },
+            padding: 12,
+            callbacks: {
+              label: ctx => {
+                const v   = ctx.parsed;
+                const pct = total > 0 ? (v / total * 100).toFixed(1) + '%' : '';
+                return ' ' + ctx.label + ': ' + fmt(v) + (pct ? '  (' + pct + ')' : '');
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  google.script.run
+    .withSuccessHandler(renderOverview)
+    .withFailureHandler(e => document.getElementById('ov-loading').textContent = 'ERROR: ' + e.message)
+    .getPortfolioStatus();
 
   // Load all three in parallel
   google.script.run.withSuccessHandler(rows => initPanel('etf', rows))
