@@ -364,6 +364,7 @@
         <thead>
           <tr id="etf-holdings-head">
             <th data-key="ticker"       data-type="str">Ticker</th>
+            <th data-key="name"         data-type="str">Name</th>
             <th data-key="price"        data-type="num" class="num">Price</th>
             <th data-key="dailyChange"  data-type="num" class="num">Day</th>
             <th data-key="weeklyChange" data-type="num" class="num">Week</th>
@@ -459,6 +460,7 @@
         <thead>
           <tr id="holdings-head">
             <th data-key="ticker"       data-type="str">Ticker</th>
+            <th data-key="name"         data-type="str">Name</th>
             <th data-key="price"        data-type="num" class="num">Price</th>
             <th data-key="dailyChange"  data-type="num" class="num">Day</th>
             <th data-key="weeklyChange" data-type="num" class="num">Week</th>
@@ -1074,6 +1076,42 @@
     return td;
   }
 
+  // Friendly display name per ticker (index / fund / company). Keyed by the
+  // base symbol (exchange suffix like .DE / .RO stripped). Add new holdings here.
+  const HOLDING_NAMES = {
+    // ETFs
+    'VUAA': 'S&P 500',
+    'EXIE': 'STOXX Europe 600',
+    'IQQ6': 'Developed Property',
+    'SXR2': 'Canada',
+    'IS3N': 'Emerging Markets',
+    'IUSN': 'World Small Cap',
+    'EUNA': 'Global Agg Bonds',
+    // Stocks
+    'PTCT': 'PTC Therapeutics',
+    'BMY':  'Bristol-Myers Squibb',
+    'INVA': 'Innoviva',
+    'AMZN': 'Amazon',
+    'NVO':  'Novo Nordisk',
+    'PFE':  'Pfizer',
+    'VST':  'Vistra',
+    'CRM':  'Salesforce',
+    'UBER': 'Uber',
+    'CMG':  'Chipotle',
+    'ADBE': 'Adobe',
+    'LULU': 'Lululemon',
+    'TVBETETF': 'BET Index',
+  };
+  function holdingName(ticker) {
+    const base = (ticker || '').split('.')[0].toUpperCase();
+    return HOLDING_NAMES[base] || '';
+  }
+  // Attach the friendly name to each row so the Name column is sortable.
+  function withNames(rows) {
+    (rows || []).forEach(r => { r.name = holdingName(r.ticker); });
+    return rows;
+  }
+
   // Daily change arrives as a fraction (e.g. 0.0394 → +3.94%).
   function holdingsPctCell(frac) {
     const td = document.createElement('td');
@@ -1191,6 +1229,7 @@
     ids: { table: 'holdings-table', head: 'holdings-head', loading: 'holdings-loading', wrap: 'holdings-wrap' },
     cells: r => [
       holdingsTickerCell(r.ticker),
+      holdingsCell(r.name),
       holdingsCell(r.price, 'num'),
       holdingsPctCell(r.dailyChange),
       holdingsSignedCell(r.weeklyChange),
@@ -1207,6 +1246,7 @@
     ids: { table: 'etf-holdings-table', head: 'etf-holdings-head', loading: 'etf-holdings-loading', wrap: 'etf-holdings-wrap' },
     cells: r => [
       holdingsTickerCell(r.ticker),
+      holdingsCell(r.name),
       holdingsCell(r.price, 'num'),
       holdingsPctCell(r.dailyChange),
       holdingsPctCell(r.weeklyChange),
@@ -1219,12 +1259,12 @@
   });
 
   google.script.run
-    .withSuccessHandler(rows => stocksHoldings.render(rows))
+    .withSuccessHandler(rows => stocksHoldings.render(withNames(rows)))
     .withFailureHandler(e => document.getElementById('holdings-loading').textContent = 'ERROR: ' + e.message)
     .getStockHoldings();
 
   google.script.run
-    .withSuccessHandler(rows => etfHoldings.render(rows))
+    .withSuccessHandler(rows => etfHoldings.render(withNames(rows)))
     .withFailureHandler(e => document.getElementById('etf-holdings-loading').textContent = 'ERROR: ' + e.message)
     .getEtfHoldings();
 
