@@ -154,6 +154,12 @@ def set_state(conn, key, value):
 REC_START = "===RECOMMENDATIONS_JSON==="
 REC_END   = "===END_RECOMMENDATIONS_JSON==="
 
+# One-time baseline so the consistency guard has prior calls to anchor on from the
+# very first run instead of starting blank. Self-expires (see BASELINE_MAX_AGE_DAYS)
+# so a cache wipe weeks later can't resurrect stale stances.
+BASELINE_PATH         = os.path.join(os.path.dirname(__file__), "baseline_recommendations.json")
+BASELINE_MAX_AGE_DAYS = 21
+
 def _to_float(v):
     """Coerce values like 148.76, '$148.76', '-4.9%' to float; None on failure."""
     if v is None:
@@ -162,6 +168,54 @@ def _to_float(v):
         return float(str(v).replace("$", "").replace("%", "").replace(",", "").strip())
     except ValueError:
         return None
+
+def seed_baseline_if_empty(conn):
+    """Bootstrap the ledger from baseline_recommendations.json when it has no rows
+    yet, so the consistency guard works from the first run. No-op once any real run
+    has written rows. Self-expires after BASELINE_MAX_AGE_DAYS so a late cache wipe
+    can't reintroduce stale stances."""
+    if conn.execute("SELECT 1 FROM recommendations LIMIT 1").fetchone():
+        return 0
+    if not os.path.exists(BASELINE_PATH):
+        return 0
+    try:
+        with open(BASELINE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[{TODAY_STR}] Warning: could not read baseline file: {e}")
+        return 0
+    week_date = (data.get("week_date") or "").strip()
+    recs      = data.get("recommendations", [])
+    if not week_date or not recs:
+        return 0
+    try:
+        age = (TODAY - datetime.date.fromisoformat(week_date)).days
+    except ValueError:
+        return 0
+    if not 0 <= age <= BASELINE_MAX_AGE_DAYS:
+        print(f"[{TODAY_STR}] Baseline {week_date} is {age}d old — outside seed window, skipping")
+        return 0
+    seeded = 0
+    for rec in recs:
+        ticker = (rec.get("ticker") or "").strip().upper()
+        stance = (rec.get("stance") or "").strip().upper()
+        if not ticker or not stance:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO recommendations "
+            "(week_date, ticker, stance, conviction, thesis, catalyst, stance_since, price, pnl_pct) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (week_date, ticker, stance,
+             (rec.get("conviction") or "").strip(),
+             (rec.get("thesis") or "").strip(),
+             (rec.get("catalyst") or "").strip(),
+             (rec.get("stance_since") or week_date).strip(),
+             _to_float(rec.get("price")), _to_float(rec.get("pnl_pct"))),
+        )
+        seeded += 1
+    conn.commit()
+    print(f"[{TODAY_STR}] Seeded {seeded} baseline recommendations from {week_date}")
+    return seeded
 
 def get_prior_recommendations(conn):
     """Return (prior_week_date, rows) from the most recent run BEFORE today.
@@ -809,6 +863,7 @@ Do NOT include: separate ETF section, separate Romania portfolio section, tax no
 # Load prior calls (memory) so stances stay consistent week-to-week instead of
 # whipsawing on a single noisy week. Same SQLite/cache rail as the article dedup.
 _mem_conn = init_db()
+seed_baseline_if_empty(_mem_conn)
 prior_week, prior_recs = get_prior_recommendations(_mem_conn)
 _mem_conn.close()
 prior_recs_block = format_prior_recommendations(prior_week, prior_recs)

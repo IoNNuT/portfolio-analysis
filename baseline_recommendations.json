@@ -1,0 +1,18 @@
+{
+  "week_date": "2026-06-08",
+  "source": "One-time seed for the recommendation memory. Built from the weekly reports of 2026-06-01 and 2026-06-08. VST is intentionally recorded as HOLD (not the erroneous 2026-06-08 SELL) to restore its standing thesis. Loaded into the ledger only when it is empty and at most ~3 weeks old; ignored thereafter.",
+  "recommendations": [
+    {"ticker": "AMZN", "stance": "HOLD", "conviction": "high",   "thesis": "Cloud + AI leader, building own AI chips", "catalyst": "",                    "stance_since": "2026-06-01", "price": 246.03, "pnl_pct": 3.4},
+    {"ticker": "ADBE", "stance": "HOLD", "conviction": "high",   "thesis": "Core long-term hold, AI in creative suite", "catalyst": "",                   "stance_since": "2026-06-01", "price": 251.44, "pnl_pct": -9.5},
+    {"ticker": "NVO",  "stance": "HOLD", "conviction": "medium", "thesis": "Wegovy pill momentum, huge new market",   "catalyst": "ADA 2026 data",        "stance_since": "2026-06-01", "price": 42.96,  "pnl_pct": 5.7},
+    {"ticker": "CRM",  "stance": "HOLD", "conviction": "medium", "thesis": "Enterprise AI/software, loss too small to act", "catalyst": "",              "stance_since": "2026-06-01", "price": 185.66, "pnl_pct": -1.9},
+    {"ticker": "PTCT", "stance": "HOLD", "conviction": "high",   "thesis": "Large gain, hold to 3% tax bracket",      "catalyst": "3% bracket 2026-07-02", "stance_since": "2026-06-01", "price": 283.88, "pnl_pct": 44.6},
+    {"ticker": "BMY",  "stance": "HOLD", "conviction": "medium", "thesis": "Defensive, in profit, hold to tax bracket", "catalyst": "3% bracket 2026-10-03", "stance_since": "2026-06-01", "price": 57.27, "pnl_pct": 24.6},
+    {"ticker": "VST",  "stance": "HOLD", "conviction": "medium", "thesis": "AI/data-center power demand",             "catalyst": "PJM decision Mar-2027", "stance_since": "2026-06-01", "price": 148.76, "pnl_pct": -4.9},
+    {"ticker": "LULU", "stance": "SELL", "conviction": "high",   "thesis": "Weak position at loss, no recovery catalyst", "catalyst": "",                "stance_since": "2026-06-01", "price": 114.23, "pnl_pct": -30.2},
+    {"ticker": "UBER", "stance": "SELL", "conviction": "medium", "thesis": "Loss, no near-term catalyst, cut concentration", "catalyst": "",             "stance_since": "2026-06-08", "price": 70.71,  "pnl_pct": -7.9},
+    {"ticker": "CMG",  "stance": "SELL", "conviction": "medium", "thesis": "Significant loss, no recovery catalyst",  "catalyst": "",                     "stance_since": "2026-06-08", "price": 29.34,  "pnl_pct": -17.9},
+    {"ticker": "PFE",  "stance": "SELL", "conviction": "medium", "thesis": "In profit, all shares 3% bracket, dividend drag", "catalyst": "",             "stance_since": "2026-06-08", "price": 26.04,  "pnl_pct": 10.7},
+    {"ticker": "INVA", "stance": "SELL", "conviction": "low",    "thesis": "In profit, 3% bracket, small, no catalyst", "catalyst": "",                   "stance_since": "2026-06-08", "price": 22.52,  "pnl_pct": 14.8}
+  ]
+}
