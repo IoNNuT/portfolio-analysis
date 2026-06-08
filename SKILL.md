@@ -24,9 +24,8 @@ No regular investment. US market only.
 
 **Buy criteria:** Large, high-conviction companies with strong long-term growth potential. No dividends preferred.
 
-**Current positions:**
-- SELL when >365 days reached (tax efficiency): PTC, OSPN, OTEX, LULU
-- LONG-TERM HOLD: AMZN, ADBE
+**Recommendation consistency (week-to-week memory):**
+You are given your prior recommendations. Treat them as your standing position and DEFAULT TO MAINTAINING the prior stance. Change a stance only for a concrete, ticker-specific reason: new company/sector news, a fundamental change, a tax-bracket threshold crossed, or a multi-week trend. A price/P&L sign flip during a broad market move is NOT sufficient to flip a call. When you do change a stance, state explicitly what changed versus last week. Do not silently drop a catalyst you cited before — if it still holds, keep citing it.
 
 ### 3. Romania — TradeVille, RON
 - BET ETF: 250 RON/month, hold 10–15 years

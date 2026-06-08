@@ -2,6 +2,7 @@ import os
 import re
 import csv
 import io
+import json
 import sqlite3
 import hashlib
 import datetime
@@ -109,6 +110,22 @@ def init_db():
             value TEXT NOT NULL
         )
     """)
+    # Per-ticker recommendation ledger — one row per stock per weekly run. Gives the
+    # analysis a memory of its own prior calls so stances don't whipsaw on noise.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recommendations (
+            week_date    TEXT NOT NULL,
+            ticker       TEXT NOT NULL,
+            stance       TEXT NOT NULL,
+            conviction   TEXT,
+            thesis       TEXT,
+            catalyst     TEXT,
+            stance_since TEXT,
+            price        REAL,
+            pnl_pct      REAL,
+            PRIMARY KEY (week_date, ticker)
+        )
+    """)
     conn.execute(
         "DELETE FROM seen_articles WHERE seen_on < ?",
         (str(TODAY - datetime.timedelta(days=14)),)
@@ -130,6 +147,114 @@ def get_state(conn, key):
 def set_state(conn, key, value):
     conn.execute("INSERT OR REPLACE INTO portfolio_state (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
+
+# ── RECOMMENDATION MEMORY ─────────────────────────────────────────────────────
+# Machine-readable markers Sonnet wraps its per-ticker call ledger in. The block
+# is parsed out and persisted, then stripped before the analysis reaches Haiku.
+REC_START = "===RECOMMENDATIONS_JSON==="
+REC_END   = "===END_RECOMMENDATIONS_JSON==="
+
+def _to_float(v):
+    """Coerce values like 148.76, '$148.76', '-4.9%' to float; None on failure."""
+    if v is None:
+        return None
+    try:
+        return float(str(v).replace("$", "").replace("%", "").replace(",", "").strip())
+    except ValueError:
+        return None
+
+def get_prior_recommendations(conn):
+    """Return (prior_week_date, rows) from the most recent run BEFORE today.
+    Using '< today' keeps same-day reruns (e.g. manual dispatch) idempotent."""
+    row = conn.execute(
+        "SELECT MAX(week_date) FROM recommendations WHERE week_date < ?", (TODAY_STR,)
+    ).fetchone()
+    prior_week = row[0] if row else None
+    if not prior_week:
+        return None, []
+    cur = conn.execute(
+        "SELECT ticker, stance, conviction, thesis, catalyst, stance_since, price, pnl_pct "
+        "FROM recommendations WHERE week_date = ? ORDER BY ticker", (prior_week,)
+    )
+    cols = [d[0] for d in cur.description]
+    return prior_week, [dict(zip(cols, r)) for r in cur.fetchall()]
+
+def save_recommendations(conn, recs):
+    """Upsert this week's calls. Carry stance_since forward when the stance is
+    unchanged vs the most recent prior week, so we can tell a long-held conviction
+    from a fresh one."""
+    _, prior_rows = get_prior_recommendations(conn)
+    prior_by_ticker = {r["ticker"]: r for r in prior_rows}
+    saved = 0
+    for rec in recs:
+        if not isinstance(rec, dict):
+            continue
+        ticker = (rec.get("ticker") or "").strip().upper()
+        stance = (rec.get("stance") or "").strip().upper()
+        if not ticker or not stance:
+            continue
+        prev = prior_by_ticker.get(ticker)
+        if prev and (prev.get("stance") or "").upper() == stance and prev.get("stance_since"):
+            stance_since = prev["stance_since"]
+        else:
+            stance_since = TODAY_STR
+        conn.execute(
+            "INSERT OR REPLACE INTO recommendations "
+            "(week_date, ticker, stance, conviction, thesis, catalyst, stance_since, price, pnl_pct) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (TODAY_STR, ticker, stance,
+             (rec.get("conviction") or "").strip(),
+             (rec.get("thesis") or "").strip(),
+             (rec.get("catalyst") or "").strip(),
+             stance_since, _to_float(rec.get("price")), _to_float(rec.get("pnl_pct"))),
+        )
+        saved += 1
+    conn.commit()
+    return saved
+
+def format_prior_recommendations(prior_week, rows):
+    """Render prior calls as a compact prompt block."""
+    if not rows:
+        return ("(No prior recommendations on record — this is the first tracked run. "
+                "Establish a baseline stance per stock.)")
+    lines = [f"(from last tracked run {prior_week} — these were YOUR calls)"]
+    for r in rows:
+        parts = [f"{r['ticker']}: {r['stance']}"]
+        if r.get("conviction"):
+            parts.append(f"conviction {r['conviction']}")
+        if r.get("stance_since"):
+            parts.append(f"since {r['stance_since']}")
+        if r.get("thesis"):
+            parts.append(f"thesis: {r['thesis']}")
+        if r.get("catalyst"):
+            parts.append(f"catalyst: {r['catalyst']}")
+        if r.get("pnl_pct") is not None:
+            parts.append(f"P&L then {r['pnl_pct']:+.1f}%")
+        lines.append("  - " + " | ".join(parts))
+    return "\n".join(lines)
+
+def extract_recommendations(text):
+    """Split the machine-readable ledger out of Sonnet's analysis.
+    Returns (clean_text_without_block, list_of_dicts). Degrades to (text, [])."""
+    start = text.find(REC_START)
+    if start == -1:
+        return text, []
+    # The report text is everything before the marker; the ledger (and anything the
+    # model stray-appended after it) lives from the marker onward and is discarded.
+    clean = text[:start].rstrip()
+    end = text.find(REC_END, start)
+    raw = text[start + len(REC_START): end if end != -1 else len(text)]
+    raw = raw.strip().strip("`").strip()
+    if raw.lower().startswith("json"):       # tolerate a ```json language hint
+        raw = raw[4:].strip()
+    try:
+        recs = json.loads(raw)
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"[{TODAY_STR}] Warning: could not parse recommendations JSON: {e}")
+        return clean, []
+    if isinstance(recs, dict):
+        recs = recs.get("recommendations", [])
+    return clean, recs if isinstance(recs, list) else []
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def strip_html(text):
@@ -681,6 +806,28 @@ Currency rule: Use EUR only for portfolio-level totals and cross-portfolio compa
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────
+# Load prior calls (memory) so stances stay consistent week-to-week instead of
+# whipsawing on a single noisy week. Same SQLite/cache rail as the article dedup.
+_mem_conn = init_db()
+prior_week, prior_recs = get_prior_recommendations(_mem_conn)
+_mem_conn.close()
+prior_recs_block = format_prior_recommendations(prior_week, prior_recs)
+print(f"[{TODAY_STR}] Prior recommendations: {len(prior_recs)} from {prior_week}")
+
+# Standing instruction (both modes) — emit the machine-readable ledger we persist.
+REC_INSTRUCTION = (
+    "After the report text, output a machine-readable block used to track your calls "
+    "week-to-week. Wrap it EXACTLY in these markers and write NOTHING after the closing marker:\n"
+    f"{REC_START}\n"
+    '[{"ticker":"VST","stance":"HOLD","conviction":"medium","thesis":"<=10 words",'
+    '"catalyst":"<=10 words or empty","price":148.76,"pnl_pct":-4.9}, ...]\n'
+    f"{REC_END}\n"
+    "Include one object for EVERY US individual stock in the holdings (exclude ETFs, bonds, "
+    "and Romanian holdings). stance must be one of BUY, ADD, HOLD, TRIM, SELL. Use plain numbers "
+    "for price and pnl_pct (no $ or %). This block is metadata only and must NOT appear anywhere "
+    "in the report sections above."
+)
+
 SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
 
 SONNET_USER = f"""Analyse this portfolio for {TODAY_STR}. Output plain text only — NO HTML, NO markdown.
@@ -701,10 +848,15 @@ Use short labeled sections. Be concise, use numbers not prose.
 ### Weekly Performance vs S&P 500
 {weekly_comparison}
 
+### Prior recommendations (YOUR previous calls — maintain unless something specific changed)
+{prior_recs_block}
+
 ### News digest (titles only)
 {news_digest}
 
-{analysis_scope}"""
+{analysis_scope}
+
+{REC_INSTRUCTION}"""
 
 print(f"[{TODAY_STR}] Step 1: Sonnet analysis...")
 analysis_text, sonnet_cost = claude_call(
@@ -714,6 +866,18 @@ analysis_text, sonnet_cost = claude_call(
     max_tokens = 4000,
 )
 print(f"[{TODAY_STR}] Analysis: {len(analysis_text)} chars")
+
+# Split the machine-readable ledger out (so it never reaches Haiku/the report) and
+# persist it as this week's memory. A parse miss degrades gracefully — the report
+# still sends; only the memory update is skipped.
+analysis_text, recs = extract_recommendations(analysis_text)
+if recs:
+    _mem_conn = init_db()
+    saved = save_recommendations(_mem_conn, recs)
+    _mem_conn.close()
+    print(f"[{TODAY_STR}] Saved {saved} recommendations to memory")
+else:
+    print(f"[{TODAY_STR}] No recommendations parsed — memory not updated this run")
 
 # ── STEP 2: HAIKU HTML RENDERING ──────────────────────────────────────────────
 # The report format is pinned to a fixed golden template (the 2026-05-25 layout).
