@@ -42,7 +42,7 @@ SHEET_GIDS = {
 # (the #gid=... at the end). Add a line here as you create each tab.
 TX_SHEETS = {
     "TXs_USD": "1053431702",       # Stocks Portfolio (XTB, USD)
-    # "TXs_EUR": "PASTE_GID_HERE", # ETF Portfolio (XTB, EUR)  — add once created
+    "TXs_ETF": "1595916700",       # ETF Portfolio (XTB, EUR)
     # "TXs_RON": "PASTE_GID_HERE", # TradeVille (RON)          — add once created
 }
 

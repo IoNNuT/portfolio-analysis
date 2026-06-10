@@ -65,7 +65,8 @@ DASHBOARD_URL               # Link to interactive dashboard
 - **Transaction tabs** — clean per-portfolio buy/sell ledgers feeding the FIFO tax table.
   Header on row 1: `Date | Ticker | Price | Transaction | Shares | Amount`; dates are US M/D/Y.
   Configured in `TX_SHEETS` (tab name → gid), unioned together. Currently: `TXs_USD`
-  (Stocks, gid=1053431702). Add `TXs_EUR` (ETF) and `TXs_RON` (TradeVille) as created.
+  (Stocks, gid=1053431702) and `TXs_ETF` (ETF, gid=1595916700). Add `TXs_RON`
+  (TradeVille) as created.
   Replaces the old multi-block `Tranzactii` dashboard tab, which was unparseable (headers
   on row 6, duplicated side-by-side blocks).
 
