@@ -4,8 +4,9 @@
 // ─────────────────────────────────────────────
 //test
 const CONFIG = {
-  MV_HEADER:       "MV",
-  INVESTED_HEADER: "Invested",
+  MV_HEADER:         "MV",
+  INVESTED_HEADER:   "Invested",
+  TTL_RETURN_HEADER: "TTL Return (Abs)",  // price gain + dividends (footer)
 };
 
 // ─────────────────────────────────────────────
@@ -56,7 +57,7 @@ function getTotalsFromTable(sheet, tableIndex) {
     const mvIdx = row.indexOf(CONFIG.MV_HEADER);
     const investedIdx = row.indexOf(CONFIG.INVESTED_HEADER);
     if (mvIdx !== -1 && investedIdx !== -1) {
-      tables.push({ headerRow: i, mvIdx, investedIdx });
+      tables.push({ headerRow: i, mvIdx, investedIdx, ttlReturnIdx: row.indexOf(CONFIG.TTL_RETURN_HEADER) });
     }
   });
 
@@ -67,7 +68,7 @@ function getTotalsFromTable(sheet, tableIndex) {
     );
   }
 
-  const { headerRow, mvIdx, investedIdx } = tables[tableIndex];
+  const { headerRow, mvIdx, investedIdx, ttlReturnIdx } = tables[tableIndex];
 
   // The table ends just before the next table's header row (or end of data)
   const nextHeader = tableIndex + 1 < tables.length
@@ -88,8 +89,9 @@ function getTotalsFromTable(sheet, tableIndex) {
   }
 
   return {
-    totalMV:       data[footerRow][mvIdx],
-    totalInvested: data[footerRow][investedIdx],
+    totalMV:         data[footerRow][mvIdx],
+    totalInvested:   data[footerRow][investedIdx],
+    totalTtlReturn:  ttlReturnIdx !== -1 ? data[footerRow][ttlReturnIdx] : null,
   };
 }
 
@@ -149,7 +151,7 @@ function recordPortfolioSnapshot_v1() {
     Logger.log("recordPortfolioSnapshot_v1: skipped — formula errors persisted after %s retries.", RETRY_CONFIG.MAX_RETRIES);
     return;
   }
-  const { totalMV, totalInvested } = getTotalsFromTable(summary, 0);
+  const { totalMV, totalInvested, totalTtlReturn } = getTotalsFromTable(summary, 0);
 
   let sheet = ss.getSheetByName("ETF History");
   if (!sheet) sheet = ss.insertSheet("ETF History");
@@ -160,7 +162,9 @@ function recordPortfolioSnapshot_v1() {
   }
 
   const today  = new Date(); today.setHours(0, 0, 0, 0);
-  const pnl    = totalMV - totalInvested;
+  // P&L includes dividends (TTL Return); MV stays holdings-only. Falls back to
+  // price-only P&L if the TTL Return column isn't present.
+  const pnl    = totalTtlReturn != null ? totalTtlReturn : totalMV - totalInvested;
   const pnlPct = pnl / totalInvested;
 
   // Skip if all values match the last recorded row

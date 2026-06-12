@@ -386,12 +386,14 @@
 
 <!-- ETF PANEL -->
 <div class="panel" id="panel-etf">
-  <div class="stats-label">LATEST SNAPSHOT</div>
+  <div class="stats-label">LIVE STATS</div>
   <div class="stats">
     <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="etf-mv">—</div></div>
     <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="etf-inv">—</div></div>
     <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="etf-pnl">—</div></div>
     <div class="stat"><div class="stat-label">Return</div><div class="stat-value" id="etf-pct">—</div></div>
+    <div class="stat"><div class="stat-label">Dividends</div><div class="stat-value" id="etf-div">—</div></div>
+    <div class="stat"><div class="stat-label">Holdings + Dividends</div><div class="stat-value neutral" id="etf-hpd">—</div></div>
   </div>
   <div class="stats-label">PERIOD PERFORMANCE</div>
   <div class="stats three">
@@ -482,7 +484,7 @@
 
 <!-- STOCKS PANEL -->
 <div class="panel" id="panel-stocks">
-  <div class="stats-label">LATEST SNAPSHOT</div>
+  <div class="stats-label">LIVE STATS</div>
   <div class="stats">
     <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="stocks-mv">—</div></div>
     <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="stocks-inv">—</div></div>
@@ -763,6 +765,45 @@
     pctEl.textContent = sign(last.pnlPct) + fmtp(last.pnlPct);
     pctEl.className = 'stat-value ' + cls(last.pnlPct);
     document.getElementById('updated').textContent = 'LAST UPDATE ' + last.date;
+  }
+
+  // Live top-box stats, read straight from the Summary sheet (overrides the
+  // history-derived values from updateLatestStats). ETF folds dividends
+  // (ttlReturn − pnl) into P&L/Return and shows the extra Dividends and
+  // Holdings + Dividends tiles; Stocks stays price-only (no dividends tracked).
+  function setLiveStat(id, value, colored) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = colored ? sign(value) + fmt(value) : fmt(value);
+    if (colored) el.className = 'stat-value ' + cls(value);
+  }
+
+  function applyLiveTotals(totals) {
+    if (totals && totals.etf) {
+      const t   = totals.etf;
+      const div = (t.ttlReturn != null && t.pnl != null) ? t.ttlReturn - t.pnl : 0;
+      const pnl = t.ttlReturn != null ? t.ttlReturn : (t.mv - t.invested);
+      setLiveStat('etf-mv',  t.mv,            false);
+      setLiveStat('etf-inv', t.invested,      false);
+      setLiveStat('etf-pnl', pnl,             true);
+      const pctEl = document.getElementById('etf-pct');
+      const ret   = t.invested ? pnl / t.invested : 0;
+      pctEl.textContent = sign(ret) + fmtp(ret);
+      pctEl.className    = 'stat-value ' + cls(ret);
+      setLiveStat('etf-div', div,             true);
+      setLiveStat('etf-hpd', t.mv + div,      false);
+    }
+    if (totals && totals.stocks) {
+      const t   = totals.stocks;
+      const pnl = t.pnl != null ? t.pnl : (t.mv - t.invested);
+      setLiveStat('stocks-mv',  t.mv,       false);
+      setLiveStat('stocks-inv', t.invested, false);
+      setLiveStat('stocks-pnl', pnl,        true);
+      const pctEl = document.getElementById('stocks-pct');
+      const ret   = t.invested ? pnl / t.invested : 0;
+      pctEl.textContent = sign(ret) + fmtp(ret);
+      pctEl.className    = 'stat-value ' + cls(ret);
+    }
   }
 
   function updatePeriodStats(type, rows) {
@@ -1559,6 +1600,11 @@
   google.script.run.withSuccessHandler(rows => initPanel('nw', rows))
     .withFailureHandler(e => document.getElementById('nw-loading').textContent = 'ERROR: ' + e.message)
     .getNetWorthData();
+
+  // Live top-box stats from the Summary sheet (overrides history-derived values).
+  google.script.run.withSuccessHandler(applyLiveTotals)
+    .withFailureHandler(e => console.error('getLiveTotals: ' + e.message))
+    .getLiveTotals();
 </script>
 </body>
 </html>

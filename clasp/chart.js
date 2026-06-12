@@ -80,6 +80,69 @@ function getEtfTotals() {
   return null;
 }
 
+// Live footer totals for one Summary table, located by a predicate on the
+// row's normalized header cells (lowercased, whitespace-collapsed). Walks past
+// the holding rows to the footer (first row whose Ticker is blank/"Total" but
+// whose Invested cell still carries a value — that's the sums row) and reads it.
+// Returns { mv, invested, pnl, ttlReturn } in € (pnl = sheet's price-only
+// "P&L (Abs)"; ttlReturn = "TTL Return (Abs)", i.e. price gain + dividends),
+// or null if the table/footer isn't found.
+function _readSummaryTableTotals_(matchHeader) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Summary");
+  if (!sheet) return null;
+
+  const disp = sheet.getDataRange().getDisplayValues();
+  const norm = c => String(c).replace(/\s+/g, " ").trim().toLowerCase();
+  const num  = v => {
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? 0 : n;
+  };
+
+  let headerRow = -1, idx = {};
+  for (let i = 0; i < disp.length; i++) {
+    const cols = {};
+    disp[i].forEach((c, j) => { const n = norm(c); if (cols[n] === undefined) cols[n] = j; });
+    if (matchHeader(cols)) { headerRow = i; idx = cols; break; }
+  }
+  if (headerRow === -1) return null;
+
+  const idxTicker = idx["ticker"];
+  const idxInv    = idx["invested"];
+  const idxMv     = idx["mv"];
+  const idxPnl    = idx["p&l (abs)"];
+  const idxRet    = idx["ttl return (abs)"];
+
+  for (let i = headerRow + 1; i < disp.length; i++) {
+    const ticker = idxTicker !== undefined ? (disp[i][idxTicker] || "").trim() : "";
+    if (ticker && !/total/i.test(ticker)) continue;   // holding row → skip to footer
+    const invCell = idxInv !== undefined ? (disp[i][idxInv] || "").trim() : "";
+    if (!invCell) break;                              // blank gap, no footer found
+    return {
+      mv:        idxMv  !== undefined ? num(disp[i][idxMv])  : null,
+      invested:  num(invCell),
+      pnl:       idxPnl !== undefined ? num(disp[i][idxPnl]) : null,
+      ttlReturn: idxRet !== undefined ? num(disp[i][idxRet]) : null,
+    };
+  }
+  return null;
+}
+
+// Live snapshot of both portfolios for the dashboard's top "LIVE" box, read
+// straight from the Summary sheet (not the daily history). The ETF and Stocks
+// tables both carry "Invested" + "TTL Return (Abs)"; only the Stocks table also
+// has a "Weekly Change" column, which is what separates them. Returns
+// { etf, stocks }, each { mv, invested, pnl, ttlReturn } or null. The ETF box
+// folds dividends (ttlReturn − pnl) into its P&L/Return and the extra tiles;
+// the Stocks box uses the price-only pnl (dividends aren't tracked there).
+function getLiveTotals() {
+  const etf = _readSummaryTableTotals_(c =>
+    c["invested"] !== undefined && c["ttl return (abs)"] !== undefined && c["weekly change"] === undefined);
+  const stocks = _readSummaryTableTotals_(c =>
+    c["invested"] !== undefined && c["ttl return (abs)"] !== undefined && c["weekly change"] !== undefined);
+  return { etf: etf, stocks: stocks };
+}
+
 function getStocksData() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const sheet   = ss.getSheetByName("Stocks History");
