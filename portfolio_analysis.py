@@ -26,6 +26,11 @@ GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 RECIPIENT_EMAIL    = os.environ["RECIPIENT_EMAIL"]
 DASHBOARD_URL      = os.environ.get("DASHBOARD_URL", "")
 
+# Newsletters arrive on iCloud Mail (not Gmail). Optional — a missing credential
+# degrades gracefully: the report still sends, just without the newsletter block.
+ICLOUD_EMAIL        = os.environ.get("ICLOUD_EMAIL", "")
+ICLOUD_APP_PASSWORD = os.environ.get("ICLOUD_APP_PASSWORD", "")
+
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%Y-%m-%d")
 DB_PATH   = os.path.join(os.path.dirname(__file__), "seen_articles.db")
@@ -59,29 +64,51 @@ TRANZACTII_COL_HINTS = {
     "shares": ["shares", "qty", "quantity", "units", "amount"],
 }
 
-# Macro/topic keywords — only used to filter the general financial news bucket.
+# Macro/topic keywords — filter the general financial news bucket AND act as the
+# relevance themes for the newsletter distill pass (see distill_newsletters).
 MACRO_KEYWORDS = [
     "Fed", "FOMC", "ECB", "BNR", "inflation", "interest rate",
     "recession", "Romania", "RON", "EUR/USD", "EUR",
     "S&P 500", "STOXX", "REIT", "bond yield", "Treasury",
     "Bitcoin", "BTC", "crypto", "cryptocurrency", "Ethereum", "ETH",
+    "AI", "artificial intelligence", "IPO",
     "Trump", "Musk",
 ]
 
 MAX_ITEMS_TOTAL = 30
 MAX_PER_FEED    = 3
 
+# ── NEWSLETTERS (iCloud) ────────────────────────────────────────────────────────
+# Subscribed newsletters land on iCloud Mail. They're pulled by sender, deduped
+# against the seen_articles cache, then Haiku-distilled into a compact, portfolio-
+# relevant digest before the Sonnet analysis ever sees them (keeps the run in budget).
+# Each source: a sender to match, plus an optional `subject` substring (server-side
+# IMAP SUBJECT match) to narrow which of that sender's mails to pull. NYT sends ~3
+# dailies/day from one address; only DealBook is finance-relevant, so we filter on it.
+NEWSLETTER_SOURCES       = [
+    {"from": "nytdirect@nytimes.com", "subject": "DealBook"},
+]
+# Folders to scan. A mail rule files newsletters into "Newsletters", but the rule may
+# not have run yet (client-side rules only fire when the Mail app is open), so scan
+# INBOX too. Message-ID dedup makes the overlap harmless. Missing folders are skipped.
+NEWSLETTER_FOLDERS       = ["INBOX", "Newsletters"]
+NEWSLETTER_LOOKBACK_DAYS = 7
+NEWSLETTER_BODY_CAP      = 6000   # chars of body text kept per newsletter before distilling
+NEWSLETTER_MAX           = 12     # cap on newsletters pulled per run (safety on cost)
+ICLOUD_HOST = "imap.mail.me.com"
+ICLOUD_PORT = 993
+
 # ── RSS FEEDS ─────────────────────────────────────────────────────────────────
 # Only live, verified feeds. Per-ticker feeds are built at runtime from holdings
 RSS_FEEDS_STATIC = {
     "General Financial News": [
-        ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/topstories/"),
+        ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
         ("CNBC",        "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
-        ("NYT Business",    "https://rss.nytimes.com/services/xml/rss/nf/Business.xml"),
-        ("NYT Economy",     "https://rss.nytimes.com/services/xml/rss/nf/Economy.xml"),
-        ("NYT Technology",  "https://rss.nytimes.com/services/xml/rss/nf/Technology.xml"),
-        ("NYT US",          "https://rss.nytimes.com/services/xml/rss/nf/US.xml"),
-        ("NYT World",       "https://rss.nytimes.com/services/xml/rss/nf/World.xml"),
+        ("NYT Business",    "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"),
+        ("NYT Economy",     "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml"),
+        ("NYT Technology",  "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"),
+        ("NYT US",          "https://rss.nytimes.com/services/xml/rss/nyt/US.xml"),
+        ("NYT World",       "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
     ],
     "Crypto": [
         ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
@@ -555,6 +582,128 @@ def fetch_all_news(symbols):
             lines.append(f"[{item['label']}] {item['title']}")
     return "\n".join(lines)
 
+# ── NEWSLETTERS (iCloud IMAP → Haiku distill) ──────────────────────────────────
+def distill_newsletters(items, symbols):
+    """Haiku pass: collapse raw newsletters into portfolio-relevant bullets.
+
+    Sonnet only ever sees these distilled bullets, never the raw HTML — that's what
+    keeps the run inside the cost budget. Returns (digest_text, cost_usd).
+    """
+    tickers = ", ".join(symbols) if symbols else "(none held)"
+    themes  = ", ".join(MACRO_KEYWORDS)
+    blocks  = [
+        f'<<< {it["source"]} — "{it["subject"]}" — {it["date"]} >>>\n{it["body"]}'
+        for it in items
+    ]
+    newsletters_text = "\n\n".join(blocks)
+
+    system = (
+        "You distill financial newsletters into portfolio-relevant bullet points. "
+        "Keep ONLY points that bear on the given holdings or macro themes. Drop everything "
+        "else (ads, subscription prompts, unrelated stories). Be factual, no hype, numbers "
+        "over prose. Output plain text only — no HTML, no markdown beyond the format shown."
+    )
+    user = f"""Held tickers: {tickers}
+Macro themes: {themes}
+
+For each newsletter below, extract up to 5 bullets relevant to the holdings/themes above.
+Tag each bullet with the ticker or theme it bears on. If a newsletter has nothing relevant,
+write "(nothing relevant)". Use exactly this format:
+
+## <source name>
+- [<TICKER or THEME>] <one-line fact or claim>
+
+### Newsletters
+{newsletters_text}"""
+
+    text, cost = claude_call(
+        model       = "claude-haiku-4-5-20251001",
+        system      = system,
+        user        = user,
+        max_tokens  = 1200,
+        temperature = 0,
+    )
+    text = text.strip()
+    if not text:
+        return "", cost
+    header = f"# Newsletter Insights — {TODAY_STR} ({len(items)} newsletter(s))\n"
+    return header + "\n" + text, cost
+
+def fetch_newsletters(symbols):
+    """Pull this week's newsletters from iCloud, dedup, distill. Returns (digest, cost).
+
+    Mirrors the email-cleanup agent's iCloud IMAP backend. Any failure — missing creds,
+    missing dep, IMAP error — degrades gracefully to ("", 0.0) so the report still sends.
+    """
+    if not (ICLOUD_EMAIL and ICLOUD_APP_PASSWORD and NEWSLETTER_SOURCES):
+        print(f"[{TODAY_STR}] Newsletters: skipped (iCloud not configured)")
+        return "", 0.0
+    try:
+        from imap_tools import AND, MailBox
+    except ImportError:
+        print(f"[{TODAY_STR}] Newsletters: skipped (imap-tools not installed)")
+        return "", 0.0
+
+    since = TODAY - datetime.timedelta(days=NEWSLETTER_LOOKBACK_DAYS)
+    conn  = init_db()
+    # (dedup_key, item) — seen-marking is deferred until distillation succeeds, so a
+    # failed run retries the same newsletters next week instead of silently dropping them.
+    pending  = []
+    run_seen = set()   # in-run guard so the same message in two folders isn't added twice
+    try:
+        with MailBox(ICLOUD_HOST, port=ICLOUD_PORT).login(
+            ICLOUD_EMAIL, ICLOUD_APP_PASSWORD, initial_folder="INBOX"
+        ) as box:
+            for folder in NEWSLETTER_FOLDERS:
+                try:
+                    box.folder.set(folder)
+                except Exception as e:
+                    print(f"  Warning: [newsletters] folder {folder!r} skipped: {e}")
+                    continue
+                for src in NEWSLETTER_SOURCES:
+                    # date_gte → IMAP SINCE; subject → IMAP SUBJECT substring (optional).
+                    crit = {"from_": src["from"], "date_gte": since}
+                    if src.get("subject"):
+                        crit["subject"] = src["subject"]
+                    for msg in box.fetch(AND(**crit), limit=NEWSLETTER_MAX, reverse=True,
+                                         mark_seen=False, bulk=True):
+                        mid = (msg.headers.get("message-id") or (msg.uid,))[0]
+                        dedup_key = f"newsletter:{mid}"
+                        if dedup_key in run_seen or is_seen(conn, dedup_key):
+                            continue
+                        body = (msg.text or strip_html(msg.html) or "").strip()
+                        if not body:
+                            continue
+                        run_seen.add(dedup_key)
+                        pending.append((dedup_key, {
+                            "source":  msg.from_ or "",
+                            "subject": msg.subject or "",
+                            "date":    msg.date.strftime("%Y-%m-%d") if msg.date else "",
+                            "body":    body[:NEWSLETTER_BODY_CAP],
+                        }))
+    except Exception as e:
+        print(f"  Warning: [newsletters] {e}")
+        conn.close()
+        return "", 0.0
+
+    if not pending:
+        print(f"[{TODAY_STR}] Newsletters: 0 new")
+        conn.close()
+        return "", 0.0
+
+    print(f"[{TODAY_STR}] Newsletters: {len(pending)} new, distilling with Haiku...")
+    try:
+        digest, cost = distill_newsletters([it for _, it in pending], symbols)
+    except Exception as e:
+        print(f"  Warning: [newsletters] distill failed: {e}")
+        conn.close()
+        return "", 0.0
+
+    for dedup_key, _ in pending:
+        mark_seen(conn, dedup_key)
+    conn.close()
+    return digest, cost
+
 # ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
 def fetch_sheet_csv(gid, name):
     if not gid:
@@ -823,6 +972,9 @@ print(f"[{TODAY_STR}] Income summary:\n{income_summary}")
 print(f"[{TODAY_STR}] Fetching RSS feeds...")
 news_digest = fetch_all_news(symbols)
 
+print(f"[{TODAY_STR}] Fetching newsletters (iCloud)...")
+newsletter_digest, newsletter_cost = fetch_newsletters(symbols)
+
 print(f"[{TODAY_STR}] Fetching weekly comparison...")
 weekly_comparison = fetch_weekly_comparison()
 print(f"[{TODAY_STR}] Weekly comparison:\n{weekly_comparison}")
@@ -885,6 +1037,16 @@ REC_INSTRUCTION = (
 
 SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
 
+# Newsletter insights are folded into the existing News/Stock-Specific/Watchlist
+# sections — no separate report section. Empty when nothing new came in this week.
+newsletter_block = (
+    "\n### Newsletter insights (distilled from subscribed newsletters)\n"
+    "Use these to inform the Global News, Stock-Specific News, and Watchlist sections — "
+    "do NOT create a separate newsletter section.\n"
+    f"{newsletter_digest}\n"
+    if newsletter_digest else ""
+)
+
 SONNET_USER = f"""Analyse this portfolio for {TODAY_STR}. Output plain text only — NO HTML, NO markdown.
 Use short labeled sections. Be concise, use numbers not prose.
 
@@ -908,7 +1070,7 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 ### News digest (titles only)
 {news_digest}
-
+{newsletter_block}
 {analysis_scope}
 
 {REC_INSTRUCTION}"""
@@ -993,8 +1155,15 @@ if html_report.startswith("```"):
 if not html_report.strip():
     raise RuntimeError("Empty HTML report from Haiku")
 
-total_cost = sonnet_cost + haiku_cost
+total_cost = sonnet_cost + haiku_cost + newsletter_cost
 print(f"[{TODAY_STR}] Total API cost: ${total_cost:.4f}")
+
+# Newsletter distill row only appears when there were newsletters to distill.
+newsletter_cost_row = (
+    f'    <tr><td style="padding:2px 16px 2px 0">Haiku 4.5 (newsletter distill)</td>'
+    f'<td style="text-align:right">${newsletter_cost:.4f}</td></tr>\n'
+    if newsletter_cost else ""
+)
 
 cost_footer = f"""
 <div style="margin-top:40px;padding:12px 16px;background:#f8f8f8;border-top:1px solid #ddd;font-family:sans-serif;font-size:13px;color:#555">
@@ -1002,7 +1171,7 @@ cost_footer = f"""
   <table style="margin-top:6px;border-collapse:collapse">
     <tr><td style="padding:2px 16px 2px 0">Sonnet 4.6 (analysis)</td><td style="text-align:right">${sonnet_cost:.4f}</td></tr>
     <tr><td style="padding:2px 16px 2px 0">Haiku 4.5 (HTML render)</td><td style="text-align:right">${haiku_cost:.4f}</td></tr>
-    <tr style="font-weight:bold;border-top:1px solid #ccc"><td style="padding:4px 16px 2px 0">Total</td><td style="text-align:right">${total_cost:.4f}</td></tr>
+{newsletter_cost_row}    <tr style="font-weight:bold;border-top:1px solid #ccc"><td style="padding:4px 16px 2px 0">Total</td><td style="text-align:right">${total_cost:.4f}</td></tr>
   </table>
 </div>"""
 

@@ -38,9 +38,13 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
 1. **Fetch:** Google Sheets (CSV API) → Summary, Utilities, Tranzactii sheets
 2. **Compute:** FIFO tax table from transaction history
 3. **Scrape:** RSS feeds (ticker-specific + macro news) + S&P 500 weekly performance via Yahoo Finance
-4. **Analyze:** Claude Sonnet (portfolio + news context, includes weekly ETF vs S&P 500 comparison)
-5. **Render:** Claude Haiku converts analysis to HTML
-6. **Distribute:** Email report + GitHub artifact
+4. **Newsletters:** Pull subscribed newsletters from iCloud Mail (IMAP, by sender), dedup against
+   the article cache, then Haiku-distill each into ~5 portfolio-relevant bullets. Folded into the
+   News/Stock-Specific/Watchlist sections — no separate report section. Optional: skipped silently
+   if iCloud creds are absent. See `NEWSLETTER_SENDERS` / `fetch_newsletters`.
+5. **Analyze:** Claude Sonnet (portfolio + news + newsletter context, includes weekly ETF vs S&P 500 comparison)
+6. **Render:** Claude Haiku converts analysis to HTML
+7. **Distribute:** Email report + GitHub artifact
 
 ## Mode Switching
 
@@ -54,6 +58,7 @@ ANTHROPIC_API_KEY           # Claude API
 GMAIL_USER, GMAIL_APP_PASSWORD  # Gmail SMTP
 RECIPIENT_EMAIL             # Report recipient
 DASHBOARD_URL               # Link to interactive dashboard
+ICLOUD_EMAIL, ICLOUD_APP_PASSWORD  # iCloud IMAP for newsletters (optional; app-specific password). Needs imap-tools.
 ```
 
 ## Google Sheets
@@ -86,4 +91,4 @@ python portfolio_analysis.py
 - **Change detection:** Hashes ticker:shares pairs only (ignores daily price/FX moves)
 - **FIFO tax:** Matches sells against oldest buy lots; outputs long/short share splits
 - **Article dedup:** Skips URLs seen in last 14 days
-- **RSS feeds:** Static (MarketWatch, CNBC, CoinDesk, Decrypt, Profit.ro) + per-ticker Yahoo Finance
+- **RSS feeds:** Static (MarketWatch, CNBC, NYT Business/Economy/Technology/US/World, CoinDesk, Decrypt, Profit.ro, GNews-RO) + per-ticker Yahoo Finance. NYT feeds use the `/services/xml/rss/nyt/` path (the old `/nf/` path was retired and 404s).
