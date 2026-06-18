@@ -242,6 +242,19 @@
   .tx-submit:disabled { opacity: 0.5; cursor: default; }
   .tx-msg { font-size: 13px; min-height: 18px; }
 
+  /* Watchlist: inline add row (horizontal) above the table, reusing tx-form styling */
+  .wl-add-card { margin-bottom: 16px; }
+  .wl-add-form { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+  .wl-add-form > label { flex: 1 1 140px; }
+  .wl-add-form > label:nth-child(3) { flex: 2 1 220px; }   /* Note gets more room */
+  .wl-add-form .tx-submit { margin-top: 0; }
+  .wl-remove {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+  }
+  .wl-remove:hover { color: var(--red); background: rgba(247,79,79,0.1); }
+  table.holdings td.note { color: var(--subtext); font-weight: normal; max-width: 260px; white-space: normal; }
+
   /* Right side of each chart toolbar: range buttons + fullscreen toggle. */
   .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -361,6 +374,7 @@
   <button class="tab" onclick="switchTab('crypto', this)">Crypto</button>
   <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
   <button class="tab" onclick="switchTab('library', this); loadReports()">Library</button>
+  <button class="tab" onclick="switchTab('watchlist', this); loadWatchlist()">Watchlist</button>
   <button class="tab" onclick="switchTab('addtx', this)">+ Transaction</button>
 </div>
 
@@ -714,6 +728,42 @@
 </div>
 
 <!-- ADD TRANSACTION PANEL -->
+<div class="panel" id="panel-watchlist">
+  <div class="stats-label">WATCHLIST</div>
+
+  <div class="chart-card wl-add-card">
+    <div class="tx-form wl-add-form">
+      <label>Ticker<input type="text" id="wl-ticker" placeholder="e.g. AMD" autocomplete="off"></label>
+      <label>Target ($)<input type="number" id="wl-target" step="any" min="0" placeholder="optional"></label>
+      <label>Note<input type="text" id="wl-note" placeholder="optional — why you're watching"></label>
+      <button class="range-btn tx-submit" id="wl-submit" onclick="addToWatchlist()">Add to Watchlist</button>
+    </div>
+    <div id="wl-msg" class="tx-msg"></div>
+  </div>
+
+  <div class="holdings-card">
+    <div id="wl-loading" class="stats-label" style="margin-bottom:0">LOADING…</div>
+    <div class="table-wrap" id="wl-wrap" style="display:none">
+      <table class="holdings" id="wl-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th class="num">Price</th>
+            <th class="num">Day</th>
+            <th class="num">Week</th>
+            <th class="num">Target</th>
+            <th class="num">vs Target</th>
+            <th>Note</th>
+            <th class="num">Added</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="panel" id="panel-addtx">
   <div class="stats-label">ADD TRANSACTION</div>
   <div class="tx-grid">
@@ -883,6 +933,105 @@
   function txError(msg, text) {
     msg.style.color = 'var(--red)';
     msg.textContent = text;
+  }
+
+  // ── WATCHLIST ───────────────────────────────────────────────────────────
+  let watchlistLoaded = false;
+  function loadWatchlist(force) {
+    if (watchlistLoaded && !force) return;
+    watchlistLoaded = true;
+    document.getElementById('wl-loading').style.display = 'block';
+    document.getElementById('wl-loading').textContent = 'LOADING…';
+    google.script.run
+      .withSuccessHandler(renderWatchlist)
+      .withFailureHandler(e => {
+        document.getElementById('wl-loading').textContent = 'ERROR: ' + (e && e.message || e);
+      })
+      .getWatchlist();
+  }
+
+  const fmtUsd = v => (v == null || isNaN(v)) ? '—'
+    : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function renderWatchlist(rows) {
+    const loading = document.getElementById('wl-loading');
+    const wrap    = document.getElementById('wl-wrap');
+    const tbody   = document.querySelector('#wl-table tbody');
+    tbody.innerHTML = '';
+    if (!rows || !rows.length) {
+      loading.style.display = 'block';
+      loading.textContent = 'WATCHLIST IS EMPTY — ADD A TICKER ABOVE';
+      wrap.style.display = 'none';
+      return;
+    }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.appendChild(holdingsTickerCell(r.ticker));
+      tr.appendChild(holdingsCell(fmtUsd(r.price), 'num'));
+      tr.appendChild(holdingsPctCell(r.daily));
+      tr.appendChild(holdingsPctCell(r.weekly));
+      tr.appendChild(holdingsCell(r.target == null ? '—' : fmtUsd(r.target), 'num'));
+      // vs Target: how far current price is from the target (negative = at/below your entry)
+      let vs = null;
+      if (r.target != null && r.price != null && r.target !== 0) vs = (r.price - r.target) / r.target;
+      tr.appendChild(holdingsPctCell(vs));
+      tr.appendChild(holdingsCell(r.note || '', 'note'));
+      tr.appendChild(holdingsCell(r.added || '', 'num'));
+      const tdX = document.createElement('td');
+      tdX.className = 'num';
+      const x = document.createElement('button');
+      x.className = 'wl-remove';
+      x.textContent = '✕';
+      x.title = 'Remove ' + r.ticker;
+      x.onclick = () => removeFromWatchlist(r.ticker, x);
+      tdX.appendChild(x);
+      tr.appendChild(tdX);
+      tbody.appendChild(tr);
+    });
+    loading.style.display = 'none';
+    wrap.style.display = 'block';
+  }
+
+  function addToWatchlist() {
+    const msg = document.getElementById('wl-msg');
+    const btn = document.getElementById('wl-submit');
+    const ticker = document.getElementById('wl-ticker').value.trim();
+    if (!ticker) { return txError(msg, 'Ticker is required.'); }
+    const targetVal = document.getElementById('wl-target').value;
+    if (targetVal !== '' && !(parseFloat(targetVal) > 0)) {
+      return txError(msg, 'Target price must be greater than 0 (or leave it blank).');
+    }
+    const item = { ticker: ticker, target: targetVal, note: document.getElementById('wl-note').value };
+
+    btn.disabled = true;
+    msg.style.color = 'var(--subtext)';
+    msg.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(res => {
+        btn.disabled = false;
+        msg.style.color = 'var(--green)';
+        msg.textContent = '✓ ' + res.ticker + ' added to the watchlist.';
+        ['wl-ticker', 'wl-target', 'wl-note'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('wl-ticker').focus();
+        loadWatchlist(true);   // refresh table (and pull live prices for the new row)
+      })
+      .withFailureHandler(e => {
+        btn.disabled = false;
+        txError(msg, e && e.message ? e.message : 'Could not add to the watchlist.');
+      })
+      .addWatchlistItem(item);
+  }
+
+  function removeFromWatchlist(ticker, btn) {
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(() => loadWatchlist(true))
+      .withFailureHandler(e => {
+        btn.disabled = false;
+        txError(document.getElementById('wl-msg'),
+          e && e.message ? e.message : 'Could not remove ' + ticker + '.');
+      })
+      .removeWatchlistItem(ticker);
   }
 
   function updateLatestStats(type, rows) {

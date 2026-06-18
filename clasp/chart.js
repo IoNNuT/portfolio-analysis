@@ -371,7 +371,7 @@ function _fetchPriceChanges_(tickers) {
 
   responses.forEach((resp, i) => {
     const t = tickers[i];
-    out[t] = { daily: null, weekly: null };
+    out[t] = { price: null, daily: null, weekly: null };
     try {
       if (resp.getResponseCode() !== 200) return;
       const result   = JSON.parse(resp.getContentText()).chart.result[0];
@@ -391,6 +391,7 @@ function _fetchPriceChanges_(tickers) {
       const lastTs = result.meta.regularMarketTime != null
         ? result.meta.regularMarketTime
         : series[series.length - 1].t;
+      out[t].price = last;
 
       // Daily: vs the previous trading day's close.
       const prev = series.length >= 2 ? series[series.length - 2].c : null;
@@ -525,3 +526,102 @@ function _insertTransactionRow_(sheetName, tx) {
 
 function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx); }
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
+
+// ── WATCHLIST ─────────────────────────────────────────────────────────────
+// Stocks the user wants to keep an eye on but doesn't (yet) hold. Backed by a
+// "Watchlist" tab — created on first add — with header row 1:
+//   Date Added | Ticker | Target Price | Note
+// Only those four are stored; current price and day/week % are fetched live on
+// read so they never go stale. Runs as the deploying user, so it has write
+// access (see appsscript.json).
+const WATCHLIST_SHEET = "Watchlist";
+
+function _watchlistSheet_(create) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(WATCHLIST_SHEET);
+  if (!sheet && create) {
+    sheet = ss.insertSheet(WATCHLIST_SHEET);
+    sheet.getRange(1, 1, 1, 4)
+         .setValues([["Date Added", "Ticker", "Target Price", "Note"]])
+         .setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// Returns the watchlist with live price data merged in:
+//   [{ ticker, target, note, added, price, daily, weekly }]
+// `daily`/`weekly` are fractions (0.0394 → +3.94%); `target` is a number or null.
+function getWatchlist() {
+  const sheet = _watchlistSheet_(false);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  const items = [];
+  values.forEach(row => {
+    const ticker = String(row[1] || "").trim().toUpperCase();
+    if (!ticker) return;
+    const added = row[0] instanceof Date
+      ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), "yyyy-MM-dd")
+      : String(row[0] || "");
+    const target = (row[2] === "" || row[2] === null) ? null : Number(row[2]);
+    items.push({
+      ticker: ticker,
+      target: (target != null && !isNaN(target)) ? target : null,
+      note:   String(row[3] || ""),
+      added:  added,
+      price:  null, daily: null, weekly: null
+    });
+  });
+
+  const live = _fetchPriceChanges_(items.map(i => i.ticker));
+  items.forEach(i => {
+    const q = live[i.ticker];
+    if (q) { i.price = q.price; i.daily = q.daily; i.weekly = q.weekly; }
+  });
+  return items;
+}
+
+// Append a ticker to the watchlist. Ticker required; target optional (>0 if
+// given); note optional. Rejects duplicates. Returns { ok, ticker }.
+function addWatchlistItem(item) {
+  const ticker = String(item && item.ticker || "").trim().toUpperCase();
+  if (!ticker) throw new Error("Ticker is required");
+
+  let target = null;
+  if (item && item.target !== "" && item.target != null) {
+    target = Number(item.target);
+    if (!(target > 0)) throw new Error("Target price must be a positive number");
+  }
+  const note = String(item && item.note || "").trim();
+
+  const sheet = _watchlistSheet_(true);
+  if (sheet.getLastRow() >= 2) {
+    const existing = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+    if (existing.some(r => String(r[0] || "").trim().toUpperCase() === ticker)) {
+      throw new Error(ticker + " is already on the watchlist");
+    }
+  }
+
+  sheet.appendRow([new Date(), ticker, target === null ? "" : target, note]);
+  SpreadsheetApp.flush();
+  return { ok: true, ticker: ticker };
+}
+
+// Remove a ticker from the watchlist. Returns { ok, removed }.
+function removeWatchlistItem(ticker) {
+  const target = String(ticker || "").trim().toUpperCase();
+  if (!target) throw new Error("Ticker is required");
+  const sheet = _watchlistSheet_(false);
+  if (!sheet || sheet.getLastRow() < 2) return { ok: true, removed: false };
+
+  const values = sheet.getRange(2, 2, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = values.length - 1; i >= 0; i--) {   // bottom-up: row indices stay valid
+    if (String(values[i][0] || "").trim().toUpperCase() === target) {
+      sheet.deleteRow(i + 2);
+      SpreadsheetApp.flush();
+      return { ok: true, removed: true };
+    }
+  }
+  return { ok: true, removed: false };
+}
