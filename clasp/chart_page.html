@@ -224,7 +224,8 @@
   .range-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
   /* Add Transaction form */
-  .tx-card { max-width: 440px; }
+  .tx-grid { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .tx-card { flex: 1 1 360px; max-width: 440px; }
   .tx-form { display: flex; flex-direction: column; gap: 12px; }
   .tx-form label {
     display: flex; flex-direction: column; gap: 5px;
@@ -714,23 +715,47 @@
 
 <!-- ADD TRANSACTION PANEL -->
 <div class="panel" id="panel-addtx">
-  <div class="stats-label">ADD TRANSACTION · STOCKS (USD)</div>
-  <div class="chart-card tx-card">
-    <div class="tx-form">
-      <label>Date<input type="date" id="tx-date"></label>
-      <label>Ticker<input type="text" id="tx-ticker" placeholder="e.g. ADBE" autocomplete="off"></label>
-      <label>Transaction
-        <select id="tx-action">
-          <option value="BUY">BUY</option>
-          <option value="SELL">SELL</option>
-        </select>
-      </label>
-      <label>Price ($)<input type="number" id="tx-price" step="any" min="0" placeholder="0.00"></label>
-      <label>Shares<input type="number" id="tx-shares" step="any" min="0" placeholder="0"></label>
-      <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
-      <button class="range-btn tx-submit" id="tx-submit" onclick="submitTransaction()">Add to TXs_USD</button>
-      <div id="tx-msg" class="tx-msg"></div>
+  <div class="stats-label">ADD TRANSACTION</div>
+  <div class="tx-grid">
+
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">Stocks (USD) → TXs_USD</div>
+      <div class="tx-form">
+        <label>Date<input type="date" id="usd-date"></label>
+        <label>Ticker<input type="text" id="usd-ticker" placeholder="e.g. ADBE" autocomplete="off"></label>
+        <label>Transaction
+          <select id="usd-action">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+        </label>
+        <label>Price ($)<input type="number" id="usd-price" step="any" min="0" placeholder="0.00"></label>
+        <label>Shares<input type="number" id="usd-shares" step="any" min="0" placeholder="0"></label>
+        <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
+        <button class="range-btn tx-submit" id="usd-submit" onclick="submitTransaction('usd')">Add to TXs_USD</button>
+        <div id="usd-msg" class="tx-msg"></div>
+      </div>
     </div>
+
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">ETF (EUR) → TXs_ETF</div>
+      <div class="tx-form">
+        <label>Date<input type="date" id="etf-date"></label>
+        <label>Ticker<input type="text" id="etf-ticker" placeholder="e.g. IS3N.DE" autocomplete="off"></label>
+        <label>Transaction
+          <select id="etf-action">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+        </label>
+        <label>Price (€)<input type="number" id="etf-price" step="any" min="0" placeholder="0.00"></label>
+        <label>Shares<input type="number" id="etf-shares" step="any" min="0" placeholder="0"></label>
+        <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
+        <button class="range-btn tx-submit" id="etf-submit" onclick="submitTransaction('etf')">Add to TXs_ETF</button>
+        <div id="etf-msg" class="tx-msg"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -803,21 +828,32 @@
     btn.classList.add('active');
     document.getElementById('panel-' + tab).classList.add('active');
     if (tab === 'addtx') {
-      const d = document.getElementById('tx-date');
-      if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);  // default today
+      const today = new Date().toISOString().slice(0, 10);
+      ['usd-date', 'etf-date'].forEach(id => {        // default both date pickers to today
+        const d = document.getElementById(id);
+        if (d && !d.value) d.value = today;
+      });
     }
   }
 
-  // Insert a Stocks (TXs_USD) buy/sell at the top of the ledger via addStocksTransaction.
-  function submitTransaction() {
-    const msg = document.getElementById('tx-msg');
-    const btn = document.getElementById('tx-submit');
+  // Per-portfolio config for the Add Transaction cards: which backend function to
+  // call and which ledger tab it targets (for the confirmation message).
+  const TX_KINDS = {
+    usd: { fn: 'addStocksTransaction', tab: 'TXs_USD' },
+    etf: { fn: 'addEtfTransaction',    tab: 'TXs_ETF' },
+  };
+
+  // Insert a buy/sell at the top of the ledger for the given portfolio kind.
+  function submitTransaction(kind) {
+    const cfg = TX_KINDS[kind];
+    const msg = document.getElementById(kind + '-msg');
+    const btn = document.getElementById(kind + '-submit');
     const tx = {
-      date:   document.getElementById('tx-date').value,
-      ticker: document.getElementById('tx-ticker').value,
-      action: document.getElementById('tx-action').value,
-      price:  document.getElementById('tx-price').value,
-      shares: document.getElementById('tx-shares').value,
+      date:   document.getElementById(kind + '-date').value,
+      ticker: document.getElementById(kind + '-ticker').value,
+      action: document.getElementById(kind + '-action').value,
+      price:  document.getElementById(kind + '-price').value,
+      shares: document.getElementById(kind + '-shares').value,
     };
     if (!tx.date)            { return txError(msg, 'Pick a date.'); }
     if (!tx.ticker.trim())   { return txError(msg, 'Ticker is required.'); }
@@ -832,15 +868,16 @@
         btn.disabled = false;
         msg.style.color = 'var(--green)';
         msg.textContent = '✓ ' + tx.action + ' ' + tx.shares + ' ' +
-          tx.ticker.trim().toUpperCase() + ' added to the top of TXs_USD.';
-        ['tx-ticker', 'tx-price', 'tx-shares'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('tx-ticker').focus();
+          tx.ticker.trim().toUpperCase() + ' added to the top of ' + cfg.tab + '.';
+        [kind + '-ticker', kind + '-price', kind + '-shares'].forEach(
+          id => document.getElementById(id).value = '');
+        document.getElementById(kind + '-ticker').focus();
       })
       .withFailureHandler(e => {
         btn.disabled = false;
         txError(msg, e && e.message ? e.message : 'Could not save the transaction.');
       })
-      .addStocksTransaction(tx);
+      [cfg.fn](tx);
   }
 
   function txError(msg, text) {

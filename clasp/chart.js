@@ -478,7 +478,7 @@ function getNetWorthData() {
   });
 }
 
-// Insert a buy/sell transaction at the TOP of the Stocks ledger tab (TXs_USD),
+// Insert a buy/sell transaction at the TOP of a per-portfolio ledger tab,
 // pushing existing rows down so the ledger stays newest-first. The Summary sheet
 // derives shares/MV from these tabs via formulas, so this is all that's needed to
 // reflect the trade. Columns: Date | Ticker | Price | Transaction | Shares | Amount.
@@ -486,9 +486,9 @@ function getNetWorthData() {
 // from the row below (with the row's number formats) rather than writing a value.
 // Runs as the deploying user (see appsscript.json), so it has write access.
 // Returns { ok, row } on success, or throws (surfaced to withFailureHandler).
-function addStocksTransaction(tx) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("TXs_USD");
-  if (!sheet) throw new Error("Sheet TXs_USD not found");
+function _insertTransactionRow_(sheetName, tx) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error("Sheet " + sheetName + " not found");
 
   const ticker = String(tx && tx.ticker || "").trim().toUpperCase();
   const action = String(tx && tx.action || "").trim().toUpperCase();   // BUY | SELL
@@ -522,3 +522,6 @@ function addStocksTransaction(tx) {
   SpreadsheetApp.flush();
   return { ok: true, row: 2 };
 }
+
+function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx); }
+function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
