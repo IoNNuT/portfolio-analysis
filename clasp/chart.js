@@ -477,3 +477,48 @@ function getNetWorthData() {
     };
   });
 }
+
+// Insert a buy/sell transaction at the TOP of the Stocks ledger tab (TXs_USD),
+// pushing existing rows down so the ledger stays newest-first. The Summary sheet
+// derives shares/MV from these tabs via formulas, so this is all that's needed to
+// reflect the trade. Columns: Date | Ticker | Price | Transaction | Shares | Amount.
+// The caller supplies the first five; Amount is a sheet formula, so we copy it down
+// from the row below (with the row's number formats) rather than writing a value.
+// Runs as the deploying user (see appsscript.json), so it has write access.
+// Returns { ok, row } on success, or throws (surfaced to withFailureHandler).
+function addStocksTransaction(tx) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("TXs_USD");
+  if (!sheet) throw new Error("Sheet TXs_USD not found");
+
+  const ticker = String(tx && tx.ticker || "").trim().toUpperCase();
+  const action = String(tx && tx.action || "").trim().toUpperCase();   // BUY | SELL
+  const price  = Number(tx && tx.price);
+  const shares = Number(tx && tx.shares);
+  if (!ticker)                                throw new Error("Ticker is required");
+  if (action !== "BUY" && action !== "SELL") throw new Error("Transaction must be BUY or SELL");
+  if (!(price  > 0))                          throw new Error("Price must be a positive number");
+  if (!(shares > 0))                          throw new Error("Shares must be a positive number");
+
+  // <input type=date> gives yyyy-mm-dd; anchor at local noon so the sheet's
+  // timezone can't shift it to the previous day. Stored as a real Date.
+  const d = (tx && tx.date) ? new Date(tx.date + "T12:00:00") : new Date();
+  if (isNaN(d.getTime())) throw new Error("Invalid date");
+
+  const hadData = sheet.getLastRow() >= 2;   // is there an existing data row to copy from?
+  sheet.insertRowBefore(2);                  // blank row 2; existing data shifts to row 3+
+
+  if (hadData) {
+    // Match the ledger's number/date formats, then copy the Amount formula down
+    // (relative refs adjust: =C3*E3 → =C2*E2).
+    sheet.getRange(3, 1, 1, 6).copyTo(sheet.getRange(2, 1, 1, 6),
+                                      SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    sheet.getRange(3, 6).copyTo(sheet.getRange(2, 6),
+                                SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+  } else {
+    sheet.getRange(2, 6).setFormula("=C2*E2");   // first ever data row — no template to copy
+  }
+
+  sheet.getRange(2, 1, 1, 5).setValues([[d, ticker, price, action, shares]]);
+  SpreadsheetApp.flush();
+  return { ok: true, row: 2 };
+}

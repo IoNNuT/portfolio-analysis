@@ -223,6 +223,24 @@
   .range-btn:hover { border-color: var(--blue); color: var(--blue); }
   .range-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
+  /* Add Transaction form */
+  .tx-card { max-width: 440px; }
+  .tx-form { display: flex; flex-direction: column; gap: 12px; }
+  .tx-form label {
+    display: flex; flex-direction: column; gap: 5px;
+    font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--subtext);
+  }
+  .tx-form input, .tx-form select {
+    font-family: 'DM Mono', monospace; font-size: 14px;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 11px; border-radius: 6px; outline: none; transition: border-color 0.15s;
+  }
+  .tx-form input:focus, .tx-form select:focus { border-color: var(--blue); }
+  .tx-amount-hint { font-size: 11px; color: var(--muted); margin-top: -2px; }
+  .tx-submit { align-self: flex-start; padding: 9px 18px; font-size: 12px; margin-top: 4px; }
+  .tx-submit:disabled { opacity: 0.5; cursor: default; }
+  .tx-msg { font-size: 13px; min-height: 18px; }
+
   /* Right side of each chart toolbar: range buttons + fullscreen toggle. */
   .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -342,6 +360,7 @@
   <button class="tab" onclick="switchTab('crypto', this)">Crypto</button>
   <button class="tab" onclick="switchTab('networth', this)">Net Worth</button>
   <button class="tab" onclick="switchTab('library', this); loadReports()">Library</button>
+  <button class="tab" onclick="switchTab('addtx', this)">+ Transaction</button>
 </div>
 
 <!-- OVERVIEW PANEL (main page) -->
@@ -693,6 +712,28 @@
   </div>
 </div>
 
+<!-- ADD TRANSACTION PANEL -->
+<div class="panel" id="panel-addtx">
+  <div class="stats-label">ADD TRANSACTION · STOCKS (USD)</div>
+  <div class="chart-card tx-card">
+    <div class="tx-form">
+      <label>Date<input type="date" id="tx-date"></label>
+      <label>Ticker<input type="text" id="tx-ticker" placeholder="e.g. ADBE" autocomplete="off"></label>
+      <label>Transaction
+        <select id="tx-action">
+          <option value="BUY">BUY</option>
+          <option value="SELL">SELL</option>
+        </select>
+      </label>
+      <label>Price ($)<input type="number" id="tx-price" step="any" min="0" placeholder="0.00"></label>
+      <label>Shares<input type="number" id="tx-shares" step="any" min="0" placeholder="0"></label>
+      <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
+      <button class="range-btn tx-submit" id="tx-submit" onclick="submitTransaction()">Add to TXs_USD</button>
+      <div id="tx-msg" class="tx-msg"></div>
+    </div>
+  </div>
+</div>
+
 <div class="hint">CTRL+SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
 
 <script>
@@ -761,6 +802,50 @@
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + tab).classList.add('active');
+    if (tab === 'addtx') {
+      const d = document.getElementById('tx-date');
+      if (d && !d.value) d.value = new Date().toISOString().slice(0, 10);  // default today
+    }
+  }
+
+  // Insert a Stocks (TXs_USD) buy/sell at the top of the ledger via addStocksTransaction.
+  function submitTransaction() {
+    const msg = document.getElementById('tx-msg');
+    const btn = document.getElementById('tx-submit');
+    const tx = {
+      date:   document.getElementById('tx-date').value,
+      ticker: document.getElementById('tx-ticker').value,
+      action: document.getElementById('tx-action').value,
+      price:  document.getElementById('tx-price').value,
+      shares: document.getElementById('tx-shares').value,
+    };
+    if (!tx.date)            { return txError(msg, 'Pick a date.'); }
+    if (!tx.ticker.trim())   { return txError(msg, 'Ticker is required.'); }
+    if (!(parseFloat(tx.price)  > 0)) { return txError(msg, 'Price must be greater than 0.'); }
+    if (!(parseFloat(tx.shares) > 0)) { return txError(msg, 'Shares must be greater than 0.'); }
+
+    btn.disabled = true;
+    msg.style.color = 'var(--subtext)';
+    msg.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(() => {
+        btn.disabled = false;
+        msg.style.color = 'var(--green)';
+        msg.textContent = '✓ ' + tx.action + ' ' + tx.shares + ' ' +
+          tx.ticker.trim().toUpperCase() + ' added to the top of TXs_USD.';
+        ['tx-ticker', 'tx-price', 'tx-shares'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('tx-ticker').focus();
+      })
+      .withFailureHandler(e => {
+        btn.disabled = false;
+        txError(msg, e && e.message ? e.message : 'Could not save the transaction.');
+      })
+      .addStocksTransaction(tx);
+  }
+
+  function txError(msg, text) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = text;
   }
 
   function updateLatestStats(type, rows) {
