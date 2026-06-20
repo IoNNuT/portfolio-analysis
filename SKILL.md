@@ -13,6 +13,8 @@
 Monthly investment: €1,000–2,000. Goal: hold 10–15+ years.
 Target allocation: S&P 500 30% | STOXX Europe 600 20% | Global REIT 15% | Canada 10% | EM 10% | Bonds 10% | Small Cap 5%
 
+**Bonds sleeve — standing instruction:** Do NOT recommend buying or adding to the global aggregate bond ETF (EUNA.DE). New money has intentionally stopped flowing into it. The Bonds allocation is currently covered by Romanian government bonds (see section 4), so the bonds sleeve being below its 10% ETF target is deliberate — do not flag it as underweight and do not suggest topping it up. The plan is to gradually shift into EUNA.DE / global agg bonds later in the 20-year investment horizon, not now. Treat EUNA.DE as HOLD only.
+
 ### 2. Individual Stocks — XTB, USD
 No regular investment. US market only.
 
@@ -31,4 +33,4 @@ You are given your prior recommendations. Treat them as your standing position a
 - BET ETF: 250 RON/month, hold 10–15 years
 
 ### 4. Romania - TradeVille, EURO
-- Romanian Government Bonds: inflation hedge for uncommitted cash
+- Romanian Government Bonds: inflation hedge for uncommitted cash. Already a large position — this currently fills the portfolio's bonds allocation, so global agg bonds (EUNA.DE) are intentionally on hold (see ETF Bonds sleeve note).
