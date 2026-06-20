@@ -8,6 +8,8 @@ on:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # allow committing the recommendation memory snapshot
 
     steps:
       - name: Checkout repository
@@ -46,6 +48,21 @@ jobs:
         with:
           path: seen_articles.db
           key: article-cache-${{ runner.os }}-${{ github.run_id }}
+
+      # Durably persist the recommendation memory in the repo so it survives an
+      # Actions cache eviction (which would otherwise wipe the ledger).
+      - name: Persist recommendation memory
+        if: always()
+        run: |
+          if [[ -n "$(git status --porcelain recommendations_memory.json)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add recommendations_memory.json
+            git commit -m "chore: update recommendation memory snapshot [skip ci]"
+            git push
+          else
+            echo "No recommendation memory changes to commit"
+          fi
 
       - name: Upload HTML report as artifact
         uses: actions/upload-artifact@v4

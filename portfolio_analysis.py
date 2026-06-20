@@ -187,6 +187,12 @@ REC_END   = "===END_RECOMMENDATIONS_JSON==="
 BASELINE_PATH         = os.path.join(os.path.dirname(__file__), "baseline_recommendations.json")
 BASELINE_MAX_AGE_DAYS = 21
 
+# Durable, git-committed snapshot of the ledger. Rewritten every run and pushed by
+# the workflow, so the recommendation memory survives a GitHub Actions cache
+# eviction (the cache, not the repo, is where seen_articles.db normally lives).
+# Preferred over the static baseline when seeding a fresh DB.
+MEMORY_PATH = os.path.join(os.path.dirname(__file__), "recommendations_memory.json")
+
 def _to_float(v):
     """Coerce values like 148.76, '$148.76', '-4.9%' to float; None on failure."""
     if v is None:
@@ -197,19 +203,21 @@ def _to_float(v):
         return None
 
 def seed_baseline_if_empty(conn):
-    """Bootstrap the ledger from baseline_recommendations.json when it has no rows
-    yet, so the consistency guard works from the first run. No-op once any real run
-    has written rows. Self-expires after BASELINE_MAX_AGE_DAYS so a late cache wipe
-    can't reintroduce stale stances."""
+    """Bootstrap the ledger when it has no rows yet, so the consistency guard works
+    from the first run. Prefers the committed memory snapshot (the durable copy that
+    survives a cache eviction) and falls back to the static baseline. No-op once any
+    real run has written rows. Self-expires after BASELINE_MAX_AGE_DAYS so a late
+    cache wipe can't reintroduce stale stances."""
     if conn.execute("SELECT 1 FROM recommendations LIMIT 1").fetchone():
         return 0
-    if not os.path.exists(BASELINE_PATH):
+    source_path = MEMORY_PATH if os.path.exists(MEMORY_PATH) else BASELINE_PATH
+    if not os.path.exists(source_path):
         return 0
     try:
-        with open(BASELINE_PATH, encoding="utf-8") as f:
+        with open(source_path, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
-        print(f"[{TODAY_STR}] Warning: could not read baseline file: {e}")
+        print(f"[{TODAY_STR}] Warning: could not read seed file {os.path.basename(source_path)}: {e}")
         return 0
     week_date = (data.get("week_date") or "").strip()
     recs      = data.get("recommendations", [])
@@ -241,7 +249,8 @@ def seed_baseline_if_empty(conn):
         )
         seeded += 1
     conn.commit()
-    print(f"[{TODAY_STR}] Seeded {seeded} baseline recommendations from {week_date}")
+    print(f"[{TODAY_STR}] Seeded {seeded} recommendations from "
+          f"{os.path.basename(source_path)} ({week_date})")
     return seeded
 
 def get_prior_recommendations(conn):
@@ -292,6 +301,40 @@ def save_recommendations(conn, recs):
         saved += 1
     conn.commit()
     return saved
+
+def export_recommendations_snapshot(conn):
+    """Dump the most recent week's calls to recommendations_memory.json so the ledger
+    survives a GitHub Actions cache eviction. The workflow commits this file; on a
+    fresh DB it re-seeds the ledger (preferred over the static baseline). Rewritten
+    with each run's date, so it stays inside the seed freshness window as long as
+    runs happen roughly weekly."""
+    row = conn.execute("SELECT MAX(week_date) FROM recommendations").fetchone()
+    week_date = row[0] if row else None
+    if not week_date:
+        return 0
+    cur = conn.execute(
+        "SELECT ticker, stance, conviction, thesis, catalyst, stance_since, price, pnl_pct "
+        "FROM recommendations WHERE week_date = ? ORDER BY ticker", (week_date,)
+    )
+    cols = [d[0] for d in cur.description]
+    recs = [dict(zip(cols, r)) for r in cur.fetchall()]
+    payload = {
+        "week_date": week_date,
+        "source": "Auto-exported recommendation memory snapshot. Durable copy of the "
+                  "ledger that survives an Actions cache eviction and re-seeds a fresh "
+                  "DB. Regenerated every run — do not hand-edit.",
+        "recommendations": recs,
+    }
+    try:
+        with open(MEMORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+            f.write("\n")
+    except OSError as e:
+        print(f"[{TODAY_STR}] Warning: could not write memory snapshot: {e}")
+        return 0
+    print(f"[{TODAY_STR}] Exported {len(recs)} recommendations to "
+          f"{os.path.basename(MEMORY_PATH)} ({week_date})")
+    return len(recs)
 
 def format_prior_recommendations(prior_week, rows):
     """Render prior calls as a compact prompt block."""
@@ -1091,6 +1134,7 @@ analysis_text, recs = extract_recommendations(analysis_text)
 if recs:
     _mem_conn = init_db()
     saved = save_recommendations(_mem_conn, recs)
+    export_recommendations_snapshot(_mem_conn)
     _mem_conn.close()
     print(f"[{TODAY_STR}] Saved {saved} recommendations to memory")
 else:
