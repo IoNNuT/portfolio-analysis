@@ -1123,7 +1123,7 @@ analysis_text, sonnet_cost = claude_call(
     model      = "claude-sonnet-4-6",
     system     = SONNET_SYSTEM,
     user       = SONNET_USER,
-    max_tokens = 4000,
+    max_tokens = 8000,
 )
 print(f"[{TODAY_STR}] Analysis: {len(analysis_text)} chars")
 
