@@ -249,6 +249,7 @@ function getEtfHoldings() {
       mv:           (disp[i][col["MV"]]         || "").trim(),
       pnlAbs:       (disp[i][col["P&L (Abs)"]]  || "").trim(),
       pnlPct:       (disp[i][col["P&L (%)"]]    || "").trim(),
+      ttlReturn:    col["TTL Return (Abs)"] !== undefined ? (disp[i][col["TTL Return (Abs)"]] || "").trim() : "",
       dailyChange:  null,
       weeklyChange: null
     });

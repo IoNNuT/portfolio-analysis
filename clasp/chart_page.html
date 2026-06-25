@@ -424,12 +424,9 @@
   <div class="stats">
     <div class="stat"><div class="stat-label">Market Value</div><div class="stat-value neutral" id="etf-mv">—</div></div>
     <div class="stat"><div class="stat-label">Invested</div><div class="stat-value neutral" id="etf-inv">—</div></div>
-    <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="etf-pnl-nodiv">—</div></div>
-    <div class="stat"><div class="stat-label">P&amp;L %</div><div class="stat-value" id="etf-pct-nodiv">—</div></div>
-    <div class="stat"><div class="stat-label">Holdings + Dividends</div><div class="stat-value neutral" id="etf-hpd">—</div></div>
+    <div class="stat"><div class="stat-label">P&amp;L</div><div class="stat-value" id="etf-pnl">—</div></div>
+    <div class="stat"><div class="stat-label">P&amp;L %</div><div class="stat-value" id="etf-pct">—</div></div>
     <div class="stat"><div class="stat-label">Dividends</div><div class="stat-value" id="etf-div">—</div></div>
-    <div class="stat"><div class="stat-label">P&amp;L inc div</div><div class="stat-value" id="etf-pnl">—</div></div>
-    <div class="stat"><div class="stat-label">P&amp;L % inc div</div><div class="stat-value" id="etf-pct">—</div></div>
   </div>
   <div class="stats-label">PERIOD PERFORMANCE</div>
   <div class="stats three">
@@ -454,6 +451,7 @@
             <th data-key="shares"       data-type="num" class="num">Shares</th>
             <th data-key="pnlPct"       data-type="num" class="num">P&amp;L %</th>
             <th data-key="pnlAbs"       data-type="num" class="num">P&amp;L</th>
+            <th data-key="ttlReturn"    data-type="num" class="num">TTL Return</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -1053,9 +1051,9 @@
   }
 
   // Live top-box stats, read straight from the Summary sheet (overrides the
-  // history-derived values from updateLatestStats). ETF folds dividends
-  // (ttlReturn − pnl) into P&L/Return and shows the extra Dividends and
-  // Holdings + Dividends tiles; Stocks stays price-only (no dividends tracked).
+  // history-derived values from updateLatestStats). ETF's headline P&L is the
+  // total return (ttlReturn) and it shows an info-only Dividends tile; Stocks
+  // stays price-only (no dividends tracked).
   function setLiveStat(id, value, colored) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1066,23 +1064,20 @@
   function applyLiveTotals(totals) {
     if (totals && totals.etf) {
       const t   = totals.etf;
-      const div     = (t.ttlReturn != null && t.pnl != null) ? t.ttlReturn - t.pnl : 0;
-      const pnl     = t.ttlReturn != null ? t.ttlReturn : (t.mv - t.invested);
-      const pnlNoDiv = t.pnl != null ? t.pnl : (t.mv - t.invested);
-      setLiveStat('etf-mv',  t.mv,            false);
-      setLiveStat('etf-inv', t.invested,      false);
-      setLiveStat('etf-pnl-nodiv', pnlNoDiv,  true);
-      const pctNoDivEl = document.getElementById('etf-pct-nodiv');
-      const retNoDiv   = t.invested ? pnlNoDiv / t.invested : 0;
-      pctNoDivEl.textContent = sign(retNoDiv) + fmtp(retNoDiv);
-      pctNoDivEl.className    = 'stat-value ' + cls(retNoDiv);
-      setLiveStat('etf-pnl', pnl,             true);
+      // Dividends are reinvested (bought back into the ETF), which inflates
+      // Invested — so the price-only P&L understates the real return. The
+      // headline P&L therefore uses total return (TTL Return = price gain +
+      // dividends); the Dividends tile stays as info only.
+      const div = (t.ttlReturn != null && t.pnl != null) ? t.ttlReturn - t.pnl : 0;
+      const pnl = t.ttlReturn != null ? t.ttlReturn : (t.mv - t.invested);
+      setLiveStat('etf-mv',  t.mv,       false);
+      setLiveStat('etf-inv', t.invested, false);
+      setLiveStat('etf-pnl', pnl,        true);
       const pctEl = document.getElementById('etf-pct');
       const ret   = t.invested ? pnl / t.invested : 0;
       pctEl.textContent = sign(ret) + fmtp(ret);
       pctEl.className    = 'stat-value ' + cls(ret);
-      setLiveStat('etf-div', div,             true);
-      setLiveStat('etf-hpd', t.mv + div,      false);
+      setLiveStat('etf-div', div,        true);
     }
     if (totals && totals.stocks) {
       const t   = totals.stocks;
@@ -1763,6 +1758,7 @@
       holdingsCell(r.shares, 'num'),
       holdingsSignedCell(r.pnlPct),
       holdingsSignedCell(r.pnlAbs),
+      holdingsSignedCell(r.ttlReturn),
     ]
   });
 
