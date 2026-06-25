@@ -527,6 +527,7 @@ function _insertTransactionRow_(sheetName, tx) {
 
 function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx); }
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
+function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx); }
 
 // ── WATCHLIST ─────────────────────────────────────────────────────────────
 // Stocks the user wants to keep an eye on but doesn't (yet) hold. Backed by a

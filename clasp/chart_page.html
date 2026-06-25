@@ -804,6 +804,25 @@
       </div>
     </div>
 
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">TradeVille (RON) → TXs_RON</div>
+      <div class="tx-form">
+        <label>Date<input type="date" id="ron-date"></label>
+        <label>Ticker<input type="text" id="ron-ticker" placeholder="e.g. TLV" autocomplete="off"></label>
+        <label>Transaction
+          <select id="ron-action">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+        </label>
+        <label>Price (lei)<input type="number" id="ron-price" step="any" min="0" placeholder="0.00"></label>
+        <label>Shares<input type="number" id="ron-shares" step="any" min="0" placeholder="0"></label>
+        <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
+        <button class="range-btn tx-submit" id="ron-submit" onclick="submitTransaction('ron')">Add to TXs_RON</button>
+        <div id="ron-msg" class="tx-msg"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -877,7 +896,7 @@
     document.getElementById('panel-' + tab).classList.add('active');
     if (tab === 'addtx') {
       const today = new Date().toISOString().slice(0, 10);
-      ['usd-date', 'etf-date'].forEach(id => {        // default both date pickers to today
+      ['usd-date', 'etf-date', 'ron-date'].forEach(id => {  // default all date pickers to today
         const d = document.getElementById(id);
         if (d && !d.value) d.value = today;
       });
@@ -889,6 +908,7 @@
   const TX_KINDS = {
     usd: { fn: 'addStocksTransaction', tab: 'TXs_USD' },
     etf: { fn: 'addEtfTransaction',    tab: 'TXs_ETF' },
+    ron: { fn: 'addRonTransaction',    tab: 'TXs_RON' },
   };
 
   // Insert a buy/sell at the top of the ledger for the given portfolio kind.

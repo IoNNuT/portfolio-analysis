@@ -48,7 +48,7 @@ SHEET_GIDS = {
 TX_SHEETS = {
     "TXs_USD": "1053431702",       # Stocks Portfolio (XTB, USD)
     "TXs_ETF": "1595916700",       # ETF Portfolio (XTB, EUR)
-    # "TXs_RON": "PASTE_GID_HERE", # TradeVille (RON)          — add once created
+    "TXs_RON": "903718253",        # TradeVille (RON)
 }
 
 # Column resolution — case-insensitive substring match on the sheet headers.
