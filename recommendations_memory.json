@@ -1,94 +1,86 @@
 {
-  "week_date": "2026-06-22",
-  "source": "Manually reconstructed from the 2026-06-22 weekly report after Sonnet was truncated at max_tokens=4000, which dropped the trailing RECOMMENDATIONS_JSON block so the run could not auto-export. Restores week-to-week continuity; conviction carried from the 2026-06-08 baseline, stance_since derived vs that baseline. Will be overwritten by the next successful auto-export.",
+  "week_date": "2026-06-29",
+  "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
-      "week_date": "2026-06-22",
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Loss deepened to -21.4% but long-term AI creative platform thesis unchanged; drop reflects broad market weakness, not fundamentals",
+      "thesis": "AI creative platform thesis intact; loss narrowed; OpenAI threat reassessed weaker",
       "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 195.16,
-      "pnl_pct": -21.4
+      "price": 202.73,
+      "pnl_pct": -18.31
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud + AI leader building own AI chips; well short of 3% bracket, no sell trigger",
+      "thesis": "Cloud+AI leader; loss is broad market move not fundamental",
       "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 244.39,
-      "pnl_pct": 2.7
+      "price": 232.69,
+      "pnl_pct": -2.19
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Defensive dividend stock in profit; tax-efficient to hold to 3% bracket",
+      "thesis": "Defensive; in profit; 3% bracket 97 days away",
       "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 54.0,
-      "pnl_pct": 17.5
+      "price": 57.52,
+      "pnl_pct": 25.15
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "CRM",
       "stance": "SELL",
       "conviction": "high",
-      "thesis": "Loss accelerated -1.9% to -15.2%; 52-week lows, ~100 employees poached by OpenAI/Anthropic, talent drain undermines Agentforce. Fundamental deterioration confirmed",
+      "thesis": "Talent drain thesis intact; acquisition article unconfirmed; AI displacement risk",
       "catalyst": "",
       "stance_since": "2026-06-22",
-      "price": 151.78,
-      "pnl_pct": -15.2
+      "price": 158.37,
+      "pnl_pct": -7.6
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "INVA",
-      "stance": "HOLD",
+      "stance": "SELL",
       "conviction": "low",
-      "thesis": "In profit; 3% bracket on earliest lot 11 days away. Hold to bracket crossing then sell for tax efficiency",
+      "thesis": "In profit; 3% bracket crosses in 4 days; small low-conviction position",
       "catalyst": "3% bracket 2026-07-02",
-      "stance_since": "2026-06-22",
-      "price": 22.49,
-      "pnl_pct": 14.7
+      "stance_since": "2026-06-29",
+      "price": 23.57,
+      "pnl_pct": 20.19
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Wegovy oral pill momentum intact; small but growing profit, hold for catalyst",
+      "thesis": "Wegovy oral pill pipeline intact; profit growing strongly",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
-      "price": 43.19,
-      "pnl_pct": 6.3
+      "price": 48.07,
+      "pnl_pct": 18.26
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Loss position, no clear near-term catalyst; robotaxi competition growing. Concentration in small portfolio warrants exit",
+      "thesis": "Near breakeven now; robotaxi competition; no clear catalyst",
       "catalyst": "",
       "stance_since": "2026-06-08",
-      "price": 71.64,
-      "pnl_pct": -6.7
+      "price": 76.2,
+      "pnl_pct": -0.7
     },
     {
-      "week_date": "2026-06-22",
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Swung -4.9% to +8.7%; AI/data-center power demand thesis intact, now in profit, hold for catalyst",
+      "thesis": "AI/data-center power demand thesis intact; in profit",
       "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 163.75,
-      "pnl_pct": 8.7
+      "price": 163.49,
+      "pnl_pct": 8.5
     }
   ]
 }
