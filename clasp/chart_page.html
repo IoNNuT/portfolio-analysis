@@ -824,6 +824,42 @@
     </div>
 
   </div>
+
+  <div class="stats-label" style="margin-top:32px">ADD DEPOSIT</div>
+  <div class="tx-grid">
+
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">Stocks (USD) → DEPs_USD</div>
+      <div class="tx-form">
+        <label>Date<input type="date" id="dep-usd-date"></label>
+        <label>Amount ($)<input type="number" id="dep-usd-amount" step="any" min="0" placeholder="0.00"></label>
+        <button class="range-btn tx-submit" id="dep-usd-submit" onclick="submitDeposit('usd')">Add to DEPs_USD</button>
+        <div id="dep-usd-msg" class="tx-msg"></div>
+      </div>
+    </div>
+
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">ETF (EUR) → DEPs_EURO</div>
+      <div class="tx-form">
+        <label>Date<input type="date" id="dep-euro-date"></label>
+        <label>Amount (€)<input type="number" id="dep-euro-amount" step="any" min="0" placeholder="0.00"></label>
+        <button class="range-btn tx-submit" id="dep-euro-submit" onclick="submitDeposit('euro')">Add to DEPs_EURO</button>
+        <div id="dep-euro-msg" class="tx-msg"></div>
+      </div>
+    </div>
+
+    <div class="chart-card tx-card">
+      <div class="chart-title" style="margin-bottom:16px">TradeVille (RON) → DEPs_RON</div>
+      <div class="tx-form">
+        <label>Amount (lei)<input type="number" id="dep-ron-amount" step="any" min="0" placeholder="0.00"></label>
+        <label>Date<input type="date" id="dep-ron-date"></label>
+        <div class="tx-amount-hint">Euro-Eq is calculated automatically from the Utilities EURO/RON parity.</div>
+        <button class="range-btn tx-submit" id="dep-ron-submit" onclick="submitDeposit('ron')">Add to DEPs_RON</button>
+        <div id="dep-ron-msg" class="tx-msg"></div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <div class="hint">CTRL+SCROLL TO ZOOM &nbsp;·&nbsp; DRAG TO PAN &nbsp;·&nbsp; DOUBLE-CLICK TO RESET</div>
@@ -896,7 +932,9 @@
     document.getElementById('panel-' + tab).classList.add('active');
     if (tab === 'addtx') {
       const today = new Date().toISOString().slice(0, 10);
-      ['usd-date', 'etf-date', 'ron-date'].forEach(id => {  // default all date pickers to today
+      // default all transaction + deposit date pickers to today
+      ['usd-date', 'etf-date', 'ron-date',
+       'dep-usd-date', 'dep-euro-date', 'dep-ron-date'].forEach(id => {
         const d = document.getElementById(id);
         if (d && !d.value) d.value = today;
       });
@@ -951,6 +989,46 @@
   function txError(msg, text) {
     msg.style.color = 'var(--red)';
     msg.textContent = text;
+  }
+
+  // Per-bucket config for the Add Deposit cards: backend function, target DEPs
+  // tab (for the confirmation message), and the currency label for that tab.
+  const DEP_KINDS = {
+    usd:  { fn: 'addUsdDeposit',  tab: 'DEPs_USD',  cur: '$'   },
+    euro: { fn: 'addEuroDeposit', tab: 'DEPs_EURO', cur: '€'   },
+    ron:  { fn: 'addRonDeposit',  tab: 'DEPs_RON',  cur: 'lei' },
+  };
+
+  // Insert a deposit at the top of the chosen DEPs ledger. For 'ron' the sheet
+  // also gets a Euro-Eq column, filled server-side from the EURO/RON parity.
+  function submitDeposit(kind) {
+    const cfg = DEP_KINDS[kind];
+    const msg = document.getElementById('dep-' + kind + '-msg');
+    const btn = document.getElementById('dep-' + kind + '-submit');
+    const dep = {
+      date:   document.getElementById('dep-' + kind + '-date').value,
+      amount: document.getElementById('dep-' + kind + '-amount').value,
+    };
+    if (!dep.date)                     { return txError(msg, 'Pick a date.'); }
+    if (!(parseFloat(dep.amount) > 0)) { return txError(msg, 'Amount must be greater than 0.'); }
+
+    btn.disabled = true;
+    msg.style.color = 'var(--subtext)';
+    msg.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(() => {
+        btn.disabled = false;
+        msg.style.color = 'var(--green)';
+        msg.textContent = '✓ Deposit of ' + dep.amount + ' ' + cfg.cur +
+          ' added to the top of ' + cfg.tab + '.';
+        document.getElementById('dep-' + kind + '-amount').value = '';
+        document.getElementById('dep-' + kind + '-amount').focus();
+      })
+      .withFailureHandler(e => {
+        btn.disabled = false;
+        txError(msg, e && e.message ? e.message : 'Could not save the deposit.');
+      })
+      [cfg.fn](dep);
   }
 
   // ── WATCHLIST ───────────────────────────────────────────────────────────

@@ -529,6 +529,73 @@ function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx)
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
 function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx); }
 
+// ── DEPOSITS ──────────────────────────────────────────────────────────────
+// Cash-in ledgers, one per investing bucket, kept newest-first like the TX tabs:
+//   DEPs_USD  (Stocks) — columns: Amount | Date
+//   DEPs_EURO (ETF)    — columns: Amount | Date
+//   DEPs_RON  (TradeVille) — columns: Dep Lei | Date | Euro-Eq
+// For DEPs_RON the amount is entered in RON and the Euro-Eq is computed at insert
+// time from the current EURO/RON parity (Utilities tab) and stored as a static
+// value — matching the existing rows, which are snapshots taken at deposit time
+// rather than live formulas. Runs as the deploying user (see appsscript.json).
+
+// RON per 1 EUR, read from the Utilities tab's "EURO/RON" row (col B).
+function _euroRonParity_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Utilities");
+  if (!sheet) throw new Error("Utilities sheet not found");
+  const rows = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][0] || "").trim().toUpperCase() === "EURO/RON") {
+      const v = rows[i][1];
+      const n = (typeof v === "number") ? v
+                                        : parseFloat(String(v).replace(/[^0-9.]/g, ""));
+      if (!(n > 0)) throw new Error("Invalid EURO/RON parity in Utilities");
+      return n;
+    }
+  }
+  throw new Error("EURO/RON parity not found in Utilities");
+}
+
+// Insert a deposit at the TOP of a DEPs ledger tab, pushing existing rows down so
+// the ledger stays newest-first. `ron` switches to the 3-column DEPs_RON layout
+// (Dep Lei | Date | Euro-Eq) and fills the Euro-Eq conversion.
+// Returns { ok, row } on success, or throws (surfaced to withFailureHandler).
+function _insertDepositRow_(sheetName, dep, ron) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error("Sheet " + sheetName + " not found");
+
+  const amount = Number(dep && dep.amount);
+  if (!(amount > 0)) throw new Error("Amount must be a positive number");
+
+  // <input type=date> gives yyyy-mm-dd; anchor at local noon so the sheet's
+  // timezone can't shift it to the previous day. Stored as a real Date.
+  const d = (dep && dep.date) ? new Date(dep.date + "T12:00:00") : new Date();
+  if (isNaN(d.getTime())) throw new Error("Invalid date");
+
+  const cols = ron ? 3 : 2;
+  const hadData = sheet.getLastRow() >= 2;   // is there an existing data row to copy formats from?
+  sheet.insertRowBefore(2);                  // blank row 2; existing data shifts to row 3+
+
+  if (hadData) {
+    // Match the ledger's number/date/currency formats from the row below.
+    sheet.getRange(3, 1, 1, cols).copyTo(sheet.getRange(2, 1, 1, cols),
+                                         SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  }
+
+  if (ron) {
+    const euroEq = amount / _euroRonParity_();
+    sheet.getRange(2, 1, 1, 3).setValues([[amount, d, euroEq]]);
+  } else {
+    sheet.getRange(2, 1, 1, 2).setValues([[amount, d]]);
+  }
+  SpreadsheetApp.flush();
+  return { ok: true, row: 2 };
+}
+
+function addUsdDeposit(dep)  { return _insertDepositRow_("DEPs_USD",  dep, false); }
+function addEuroDeposit(dep) { return _insertDepositRow_("DEPs_EURO", dep, false); }
+function addRonDeposit(dep)  { return _insertDepositRow_("DEPs_RON",  dep, true);  }
+
 // ── WATCHLIST ─────────────────────────────────────────────────────────────
 // Stocks the user wants to keep an eye on but doesn't (yet) hold. Backed by a
 // "Watchlist" tab — created on first add — with header row 1:
