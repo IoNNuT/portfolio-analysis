@@ -817,7 +817,8 @@
         </label>
         <label>Price (lei)<input type="number" id="ron-price" step="any" min="0" placeholder="0.00"></label>
         <label>Shares<input type="number" id="ron-shares" step="any" min="0" placeholder="0"></label>
-        <div class="tx-amount-hint">Amount is calculated automatically by the sheet.</div>
+        <label>Broker Tax (lei)<input type="number" id="ron-tax" step="any" min="0" placeholder="0.00"></label>
+        <div class="tx-amount-hint">Amount is calculated automatically by the sheet. Broker tax is optional.</div>
         <button class="range-btn tx-submit" id="ron-submit" onclick="submitTransaction('ron')">Add to TXs_RON</button>
         <div id="ron-msg" class="tx-msg"></div>
       </div>
@@ -851,8 +852,8 @@
     <div class="chart-card tx-card">
       <div class="chart-title" style="margin-bottom:16px">TradeVille (RON) → DEPs_RON</div>
       <div class="tx-form">
-        <label>Amount (lei)<input type="number" id="dep-ron-amount" step="any" min="0" placeholder="0.00"></label>
         <label>Date<input type="date" id="dep-ron-date"></label>
+        <label>Amount (lei)<input type="number" id="dep-ron-amount" step="any" min="0" placeholder="0.00"></label>
         <div class="tx-amount-hint">Euro-Eq is calculated automatically from the Utilities EURO/RON parity.</div>
         <button class="range-btn tx-submit" id="dep-ron-submit" onclick="submitDeposit('ron')">Add to DEPs_RON</button>
         <div id="dep-ron-msg" class="tx-msg"></div>
@@ -961,10 +962,15 @@
       price:  document.getElementById(kind + '-price').value,
       shares: document.getElementById(kind + '-shares').value,
     };
+    const taxEl = document.getElementById(kind + '-tax');   // only the RON card has this
+    if (taxEl) tx.brokerTax = taxEl.value;
     if (!tx.date)            { return txError(msg, 'Pick a date.'); }
     if (!tx.ticker.trim())   { return txError(msg, 'Ticker is required.'); }
     if (!(parseFloat(tx.price)  > 0)) { return txError(msg, 'Price must be greater than 0.'); }
     if (!(parseFloat(tx.shares) > 0)) { return txError(msg, 'Shares must be greater than 0.'); }
+    if (taxEl && taxEl.value !== '' && !(parseFloat(taxEl.value) >= 0)) {
+      return txError(msg, 'Broker tax must be 0 or greater.');
+    }
 
     btn.disabled = true;
     msg.style.color = 'var(--subtext)';
@@ -975,8 +981,8 @@
         msg.style.color = 'var(--green)';
         msg.textContent = '✓ ' + tx.action + ' ' + tx.shares + ' ' +
           tx.ticker.trim().toUpperCase() + ' added to the top of ' + cfg.tab + '.';
-        [kind + '-ticker', kind + '-price', kind + '-shares'].forEach(
-          id => document.getElementById(id).value = '');
+        [kind + '-ticker', kind + '-price', kind + '-shares', kind + '-tax'].forEach(
+          id => { const el = document.getElementById(id); if (el) el.value = ''; });
         document.getElementById(kind + '-ticker').focus();
       })
       .withFailureHandler(e => {

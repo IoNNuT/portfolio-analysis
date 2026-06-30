@@ -486,9 +486,11 @@ function getNetWorthData() {
 // reflect the trade. Columns: Date | Ticker | Price | Transaction | Shares | Amount.
 // The caller supplies the first five; Amount is a sheet formula, so we copy it down
 // from the row below (with the row's number formats) rather than writing a value.
+// `hasBrokerTax` enables the TXs_RON layout's optional 7th column (Broker Tax),
+// written as a plain value from tx.brokerTax when supplied.
 // Runs as the deploying user (see appsscript.json), so it has write access.
 // Returns { ok, row } on success, or throws (surfaced to withFailureHandler).
-function _insertTransactionRow_(sheetName, tx) {
+function _insertTransactionRow_(sheetName, tx, hasBrokerTax) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error("Sheet " + sheetName + " not found");
 
@@ -501,19 +503,27 @@ function _insertTransactionRow_(sheetName, tx) {
   if (!(price  > 0))                          throw new Error("Price must be a positive number");
   if (!(shares > 0))                          throw new Error("Shares must be a positive number");
 
+  // Broker tax is optional; when present it must be a non-negative number.
+  let brokerTax = null;
+  if (hasBrokerTax && tx && tx.brokerTax !== "" && tx.brokerTax != null) {
+    brokerTax = Number(tx.brokerTax);
+    if (!(brokerTax >= 0)) throw new Error("Broker tax must be a non-negative number");
+  }
+
   // <input type=date> gives yyyy-mm-dd; anchor at local noon so the sheet's
   // timezone can't shift it to the previous day. Stored as a real Date.
   const d = (tx && tx.date) ? new Date(tx.date + "T12:00:00") : new Date();
   if (isNaN(d.getTime())) throw new Error("Invalid date");
 
+  const cols = hasBrokerTax ? 7 : 6;
   const hadData = sheet.getLastRow() >= 2;   // is there an existing data row to copy from?
   sheet.insertRowBefore(2);                  // blank row 2; existing data shifts to row 3+
 
   if (hadData) {
     // Match the ledger's number/date formats, then copy the Amount formula down
     // (relative refs adjust: =C3*E3 → =C2*E2).
-    sheet.getRange(3, 1, 1, 6).copyTo(sheet.getRange(2, 1, 1, 6),
-                                      SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    sheet.getRange(3, 1, 1, cols).copyTo(sheet.getRange(2, 1, 1, cols),
+                                         SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
     sheet.getRange(3, 6).copyTo(sheet.getRange(2, 6),
                                 SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
   } else {
@@ -521,13 +531,14 @@ function _insertTransactionRow_(sheetName, tx) {
   }
 
   sheet.getRange(2, 1, 1, 5).setValues([[d, ticker, price, action, shares]]);
+  if (brokerTax != null) sheet.getRange(2, 7).setValue(brokerTax);
   SpreadsheetApp.flush();
   return { ok: true, row: 2 };
 }
 
 function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx); }
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
-function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx); }
+function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx, true); }
 
 // ── DEPOSITS ──────────────────────────────────────────────────────────────
 // Cash-in ledgers, one per investing bucket, kept newest-first like the TX tabs:
