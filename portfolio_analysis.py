@@ -18,8 +18,9 @@ ANTHROPIC_API_KEY  = os.environ["ANTHROPIC_API_KEY"]
 
 # API pricing per million tokens
 _MODEL_PRICES = {
+    "claude-sonnet-5":           {"input": 3.00, "output": 15.00},  # sticker; intro $2/$10 through 2026-08-31
     "claude-sonnet-4-6":         {"input": 3.00, "output": 15.00},
-    "claude-haiku-4-5-20251001": {"input": 0.80, "output":  4.00},
+    "claude-haiku-4-5-20251001": {"input": 1.00, "output":  5.00},
 }
 GMAIL_USER         = os.environ["GMAIL_USER"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
@@ -416,6 +417,12 @@ def claude_call(model, system, user, max_tokens, temperature=None):
     prices = _MODEL_PRICES.get(model, {"input": 0, "output": 0})
     cost   = (inp * prices["input"] + out * prices["output"]) / 1_000_000
     print(f"  [{model}] input: {inp}, output: {out}, cost: ${cost:.4f}")
+    # Truncation is otherwise invisible here — stop_reason is discarded and the only
+    # downstream symptom is the recs ledger failing to parse. Surface it loudly so a
+    # too-tight max_tokens (e.g. adaptive thinking eating the budget) is diagnosable.
+    if data.get("stop_reason") == "max_tokens":
+        print(f"  [{model}] WARNING: output truncated (stop_reason=max_tokens) — "
+              f"raise max_tokens (currently {max_tokens})")
     text = "".join(b["text"] for b in data.get("content", []) if b.get("type") == "text")
     return text, cost
 
@@ -1120,10 +1127,12 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 print(f"[{TODAY_STR}] Step 1: Sonnet analysis...")
 analysis_text, sonnet_cost = claude_call(
-    model      = "claude-sonnet-4-6",
+    model      = "claude-sonnet-5",
     system     = SONNET_SYSTEM,
     user       = SONNET_USER,
-    max_tokens = 8000,
+    max_tokens = 16000,  # Sonnet 5 runs adaptive thinking by default (unlike 4.6);
+                         # thinking shares this budget, so give the analysis text room
+                         # to avoid truncating the recommendations ledger at the end.
 )
 print(f"[{TODAY_STR}] Analysis: {len(analysis_text)} chars")
 
