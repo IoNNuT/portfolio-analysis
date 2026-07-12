@@ -1035,28 +1035,28 @@ is_full   = portfolio_changed(signature)
 
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — 8 sections only:
+    analysis_scope = """Perform a FULL analysis — 7 sections only:
 1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
-2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
+2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. When news drives the call, fold ONE short news-driver clause into that stock's rationale (<=12 words, e.g. "insider buying supports hold"). Per-ticker news lives HERE, nowhere else. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
-4. Stock-Specific News — per ticker from digest
-5. Romania News — from digest
-6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
-7. Watchlist & Alerts — 3-5 opportunities or risks
-8. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
+4. Romania News — from digest
+5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
+6. Watchlist & Alerts — 3-5 opportunities or risks
+7. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency.
+No separate stock-specific news section — per-ticker news belongs inside each stock's Section 2 rationale, stated once and never repeated elsewhere.
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
-    analysis_scope = """Portfolio UNCHANGED. Sections 1-2: one-line summary each only. Section 1 must include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
-Focus on sections 3-8 in full detail:
+    analysis_scope = """Portfolio UNCHANGED. Section 1: one-line summary only, including the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
+Focus on sections 2-7 in full detail:
+2. Individual Stocks — positions unchanged, so skip the tax-bracket recompute; for each US stock give the current buy/sell/hold and, when news drives the call, ONE short news-driver clause (<=12 words). Per-ticker news lives HERE — do NOT create a separate stock-specific news section.
 3. Global News — 3-5 items from digest
-4. Stock-Specific News — per ticker from digest
-5. Romania News — from digest
-6. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
-7. Watchlist & Alerts — 3-5 opportunities or risks
-8. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
+4. Romania News — from digest
+5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
+6. Watchlist & Alerts — 3-5 opportunities or risks
+7. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency (USD for US stocks, RON for Romanian stocks).
 Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
@@ -1087,12 +1087,14 @@ REC_INSTRUCTION = (
 
 SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
 
-# Newsletter insights are folded into the existing News/Stock-Specific/Watchlist
-# sections — no separate report section. Empty when nothing new came in this week.
+# Newsletter insights are folded into the existing Global News / per-stock Section 2
+# rationale / Watchlist sections — no separate report section. Empty when nothing new
+# came in this week.
 newsletter_block = (
     "\n### Newsletter insights (distilled from subscribed newsletters)\n"
-    "Use these to inform the Global News, Stock-Specific News, and Watchlist sections — "
-    "do NOT create a separate newsletter section.\n"
+    "Use these to inform the Global News, the per-stock rationale in Section 2 (Individual "
+    "Stocks), and the Watchlist section — do NOT create a separate newsletter or "
+    "stock-specific news section.\n"
     f"{newsletter_digest}\n"
     if newsletter_digest else ""
 )
@@ -1168,7 +1170,7 @@ HAIKU_USER = f"""Render the portfolio analysis below into HTML by reproducing th
 
 Rules:
 - Copy the template's <style> block verbatim — same colours, fonts, spacing, class names.
-- Keep the same 8 sections in the same order with the same headings and numbering.
+- Keep the same 7 sections in the same order with the same headings and numbering.
 - Reuse the template's component patterns: .summary-box rows, the holdings <table>, .stock-detail cards
   grouped under "Sell Recommendations" / "Hold Recommendations", .section-intro callouts,
   .alert / .alert.opportunity / .alert.sell cards, and .summary-row lists.

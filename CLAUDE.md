@@ -40,7 +40,7 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
 3. **Scrape:** RSS feeds (ticker-specific + macro news) + S&P 500 weekly performance via Yahoo Finance
 4. **Newsletters:** Pull subscribed newsletters from iCloud Mail (IMAP, by sender), dedup against
    the article cache, then Haiku-distill each into ~5 portfolio-relevant bullets. Folded into the
-   News/Stock-Specific/Watchlist sections — no separate report section. Optional: skipped silently
+   Global News, per-stock Section 2 rationale, and Watchlist sections — no separate report section. Optional: skipped silently
    if iCloud creds are absent. See `NEWSLETTER_SENDERS` / `fetch_newsletters`.
 5. **Analyze:** Claude Sonnet (portfolio + news + newsletter context, includes weekly ETF vs S&P 500 comparison)
 6. **Render:** Claude Haiku converts analysis to HTML
