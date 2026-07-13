@@ -1,86 +1,86 @@
 {
-  "week_date": "2026-07-06",
+  "week_date": "2026-07-13",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "AI creative thesis intact; insider buying, loss narrowing",
+      "thesis": "AI creative thesis intact, loss narrowing",
       "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 219.72,
-      "pnl_pct": -11.46
+      "price": 223.64,
+      "pnl_pct": -9.88
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud+AI leader; power constraints are sector-wide",
+      "thesis": "Cloud+AI leader, power constraints sector-wide",
       "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 242.67,
-      "pnl_pct": 2.01
+      "price": 245.34,
+      "pnl_pct": 3.13
     },
     {
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Defensive, in profit, awaiting 3% tax bracket",
+      "thesis": "Defensive, in profit, awaiting 3% bracket",
       "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 58.13,
-      "pnl_pct": 26.48
+      "price": 57.58,
+      "pnl_pct": 25.28
     },
     {
       "ticker": "CRM",
       "stance": "SELL",
       "conviction": "high",
-      "thesis": "Talent drain, AI displacement risk persists despite F1 deal",
+      "thesis": "Talent drain, AI displacement risk persists",
       "catalyst": "",
       "stance_since": "2026-06-22",
-      "price": 166.11,
-      "pnl_pct": -3.08
+      "price": 163.32,
+      "pnl_pct": -4.71
     },
     {
       "ticker": "INVA",
       "stance": "SELL",
       "conviction": "low",
-      "thesis": "3% tax bracket reached, small low-conviction position",
-      "catalyst": "3% bracket reached 2026-07-02",
+      "thesis": "3% tax bracket reached, low conviction",
+      "catalyst": "",
       "stance_since": "2026-06-29",
-      "price": 22.31,
-      "pnl_pct": 13.77
+      "price": 22.24,
+      "pnl_pct": 13.41
     },
     {
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Wegovy oral pill pipeline intact, profit growing",
+      "thesis": "Wegovy oral pill pipeline intact",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
-      "price": 50.43,
-      "pnl_pct": 24.07
+      "price": 49.48,
+      "pnl_pct": 21.73
     },
     {
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Robotaxi competition intensifying, no clear catalyst",
+      "thesis": "Robotaxi competition intensifying, no catalyst",
       "catalyst": "",
       "stance_since": "2026-06-08",
-      "price": 74.43,
-      "pnl_pct": -3.01
+      "price": 74.54,
+      "pnl_pct": -2.87
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "AI/data-center power demand thesis intact despite pullback",
+      "thesis": "AI/data-center power demand thesis intact",
       "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 151.05,
-      "pnl_pct": 0.24
+      "price": 158.86,
+      "pnl_pct": 5.42
     }
   ]
 }
