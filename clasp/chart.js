@@ -540,28 +540,62 @@ function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx)
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
 function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx, true); }
 
-// Distinct tickers already traded in each per-portfolio ledger tab, feeding the
-// Add Transaction ticker dropdowns. Column B is Ticker (header on row 1); values
-// are upper-cased, de-duplicated and sorted. Reads the ledgers rather than the
-// Summary holdings so fully-sold positions stay pickable (a re-buy is common).
-// A missing or empty tab yields []. Returns { usd, etf, ron }.
+// Currently-held tickers per portfolio, feeding the Add Transaction ticker
+// dropdowns: { usd, etf, ron }, upper-cased and in sheet order.
+//
+// Reads the same three "Summary" holdings tables the dashboard's own tables show
+// (Stocks / ETF / BET), so the dropdown can never disagree with what you see on
+// the ETF and Stocks tabs. Deliberately NOT netted from the TXs_* ledgers: that
+// arithmetic keeps sold-out positions alive on fractional-share dust (a 3.78-share
+// buy closed by a 3.76-share sell leaves 0.02 shares behind, which the Summary
+// table already excludes but a net > 0 test would list).
+//
+// Table detection mirrors the getStockHoldings / getEtfHoldings /
+// getRomaniaHoldings predicates — see those for why each column set is decisive.
+// Rows run from the header to the footer (the first blank Ticker). A missing
+// Summary sheet or unlocated table yields [], leaving "+ New ticker…" as the only
+// dropdown entry, which still works.
 function getTxTickers() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Summary");
+  if (!sheet) return { usd: [], etf: [], ron: [] };
 
-  const read = function (sheetName) {
-    const sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return [];
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return [];
-    const seen = {};
-    sheet.getRange(2, 2, lastRow - 1, 1).getDisplayValues().forEach(function (row) {
-      const t = String(row[0] || "").trim().toUpperCase();
-      if (t) seen[t] = true;
-    });
-    return Object.keys(seen).sort();
+  const disp = sheet.getDataRange().getDisplayValues();
+  const has  = function (row, name) { return row.indexOf(name) !== -1; };
+
+  const findHeader = function (pred) {
+    for (let i = 0; i < disp.length; i++) if (pred(disp[i])) return i;
+    return -1;
   };
 
-  return { usd: read("TXs_USD"), etf: read("TXs_ETF"), ron: read("TXs_RON") };
+  const tickersUnder = function (headerRow) {
+    if (headerRow === -1) return [];
+    const idx = disp[headerRow].indexOf("Ticker");
+    const out = [];
+    for (let i = headerRow + 1; i < disp.length; i++) {
+      const t = (disp[i][idx] || "").trim().toUpperCase();
+      if (!t) break;                       // blank ticker = footer/total row
+      if (out.indexOf(t) === -1) out.push(t);
+    }
+    return out;
+  };
+
+  return {
+    // Stocks: the only holdings table with a "Weekly Change" column.
+    usd: tickersUnder(findHeader(function (r) {
+      return has(r, "Ticker") && has(r, "Weekly Change");
+    })),
+    // ETF: has Cost Basis + MV but no Weekly Change; sits first in the sheet.
+    etf: tickersUnder(findHeader(function (r) {
+      return has(r, "Ticker") && has(r, "Cost Basis") && has(r, "MV") &&
+             !has(r, "Weekly Change");
+    })),
+    // BET (TradeVille): "Weighting" without the ETF table's "Target Weight",
+    // the Stocks table's "Weekly Change", or the bonds table's "SCADENTA".
+    ron: tickersUnder(findHeader(function (r) {
+      return has(r, "Ticker") && has(r, "Weighting") && !has(r, "Target Weight") &&
+             !has(r, "Weekly Change") && !has(r, "SCADENTA");
+    })),
+  };
 }
 
 // ── DEPOSITS ──────────────────────────────────────────────────────────────
