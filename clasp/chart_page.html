@@ -244,6 +244,9 @@
     padding: 9px 11px; border-radius: 6px; outline: none; transition: border-color 0.15s;
   }
   .tx-form input:focus, .tx-form select:focus { border-color: var(--blue); }
+  /* Free-text ticker box: hidden until "+ New ticker…" is picked in the dropdown */
+  .tx-ticker-new { display: none; }
+  .tx-ticker-new.show { display: block; }
   .tx-amount-hint { font-size: 11px; color: var(--muted); margin-top: -2px; }
   .tx-submit { align-self: flex-start; padding: 9px 18px; font-size: 12px; margin-top: 4px; }
   .tx-submit:disabled { opacity: 0.5; cursor: default; }
@@ -799,7 +802,12 @@
       <div class="chart-title" style="margin-bottom:16px">Stocks (USD) → TXs_USD</div>
       <div class="tx-form">
         <label>Date<input type="date" id="usd-date"></label>
-        <label>Ticker<input type="text" id="usd-ticker" placeholder="e.g. ADBE" autocomplete="off"></label>
+        <label>Ticker
+          <select id="usd-ticker" onchange="onTickerChange('usd')">
+            <option value="">Loading…</option>
+          </select>
+          <input type="text" id="usd-ticker-new" class="tx-ticker-new" placeholder="e.g. ADBE" autocomplete="off">
+        </label>
         <label>Transaction
           <select id="usd-action">
             <option value="BUY">BUY</option>
@@ -818,7 +826,12 @@
       <div class="chart-title" style="margin-bottom:16px">ETF (EUR) → TXs_ETF</div>
       <div class="tx-form">
         <label>Date<input type="date" id="etf-date"></label>
-        <label>Ticker<input type="text" id="etf-ticker" placeholder="e.g. IS3N.DE" autocomplete="off"></label>
+        <label>Ticker
+          <select id="etf-ticker" onchange="onTickerChange('etf')">
+            <option value="">Loading…</option>
+          </select>
+          <input type="text" id="etf-ticker-new" class="tx-ticker-new" placeholder="e.g. IS3N.DE" autocomplete="off">
+        </label>
         <label>Transaction
           <select id="etf-action">
             <option value="BUY">BUY</option>
@@ -837,7 +850,12 @@
       <div class="chart-title" style="margin-bottom:16px">TradeVille (RON) → TXs_RON</div>
       <div class="tx-form">
         <label>Date<input type="date" id="ron-date"></label>
-        <label>Ticker<input type="text" id="ron-ticker" placeholder="e.g. TLV" autocomplete="off"></label>
+        <label>Ticker
+          <select id="ron-ticker" onchange="onTickerChange('ron')">
+            <option value="">Loading…</option>
+          </select>
+          <input type="text" id="ron-ticker-new" class="tx-ticker-new" placeholder="e.g. TLV" autocomplete="off">
+        </label>
         <label>Transaction
           <select id="ron-action">
             <option value="BUY">BUY</option>
@@ -979,6 +997,61 @@
     ron: { fn: 'addRonTransaction',    tab: 'TXs_RON' },
   };
 
+  // ── Ticker pickers ────────────────────────────────────────────────────────
+  // Each card's Ticker field is a dropdown of the tickers already traded in that
+  // portfolio's ledger (USD → stocks, ETF → ETFs, RON → TradeVille), plus a
+  // "+ New ticker…" escape hatch that reveals a free-text box for a first-time
+  // position. The dropdown and the box share one logical value — see txTicker().
+  const TX_NEW_TICKER = '__new__';
+
+  function populateTickerDropdowns(byKind) {
+    Object.keys(TX_KINDS).forEach(kind => {
+      const sel     = document.getElementById(kind + '-ticker');
+      const tickers = (byKind && byKind[kind]) || [];
+      sel.innerHTML = '';
+      sel.appendChild(new Option(tickers.length ? 'Select a ticker…' : 'No tickers yet', ''));
+      tickers.forEach(t => sel.appendChild(new Option(t, t)));
+      sel.appendChild(new Option('+ New ticker…', TX_NEW_TICKER));
+      onTickerChange(kind);
+    });
+  }
+
+  function onTickerChange(kind) {
+    const isNew = document.getElementById(kind + '-ticker').value === TX_NEW_TICKER;
+    const input = document.getElementById(kind + '-ticker-new');
+    input.classList.toggle('show', isNew);
+    if (isNew) input.focus(); else input.value = '';
+  }
+
+  // Effective ticker for a card: the dropdown pick, or the typed value when
+  // "+ New ticker…" is selected.
+  function txTicker(kind) {
+    const picked = document.getElementById(kind + '-ticker').value;
+    return picked === TX_NEW_TICKER
+      ? document.getElementById(kind + '-ticker-new').value
+      : picked;
+  }
+
+  function resetTicker(kind) {
+    document.getElementById(kind + '-ticker').value = '';
+    onTickerChange(kind);
+  }
+
+  // Keep a just-added first-time ticker in the dropdown (before the "+ New…"
+  // entry) so a follow-up trade on it doesn't need the free-text box again.
+  function rememberTicker(kind, ticker) {
+    const sel = document.getElementById(kind + '-ticker');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === ticker) return;
+    }
+    sel.add(new Option(ticker, ticker), sel.options[sel.options.length - 1]);
+  }
+
+  google.script.run
+    .withSuccessHandler(populateTickerDropdowns)
+    .withFailureHandler(() => populateTickerDropdowns(null))   // still usable via "+ New ticker…"
+    .getTxTickers();
+
   // Insert a buy/sell at the top of the ledger for the given portfolio kind.
   function submitTransaction(kind) {
     const cfg = TX_KINDS[kind];
@@ -986,7 +1059,7 @@
     const btn = document.getElementById(kind + '-submit');
     const tx = {
       date:   document.getElementById(kind + '-date').value,
-      ticker: document.getElementById(kind + '-ticker').value,
+      ticker: txTicker(kind),
       action: document.getElementById(kind + '-action').value,
       price:  document.getElementById(kind + '-price').value,
       shares: document.getElementById(kind + '-shares').value,
@@ -1010,7 +1083,9 @@
         msg.style.color = 'var(--green)';
         msg.textContent = '✓ ' + tx.action + ' ' + tx.shares + ' ' +
           tx.ticker.trim().toUpperCase() + ' added to the top of ' + cfg.tab + '.';
-        [kind + '-ticker', kind + '-price', kind + '-shares', kind + '-tax'].forEach(
+        rememberTicker(kind, tx.ticker.trim().toUpperCase());
+        resetTicker(kind);
+        [kind + '-price', kind + '-shares', kind + '-tax'].forEach(
           id => { const el = document.getElementById(id); if (el) el.value = ''; });
         document.getElementById(kind + '-ticker').focus();
       })

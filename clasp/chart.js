@@ -540,6 +540,30 @@ function addStocksTransaction(tx) { return _insertTransactionRow_("TXs_USD", tx)
 function addEtfTransaction(tx)    { return _insertTransactionRow_("TXs_ETF", tx); }
 function addRonTransaction(tx)    { return _insertTransactionRow_("TXs_RON", tx, true); }
 
+// Distinct tickers already traded in each per-portfolio ledger tab, feeding the
+// Add Transaction ticker dropdowns. Column B is Ticker (header on row 1); values
+// are upper-cased, de-duplicated and sorted. Reads the ledgers rather than the
+// Summary holdings so fully-sold positions stay pickable (a re-buy is common).
+// A missing or empty tab yields []. Returns { usd, etf, ron }.
+function getTxTickers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const read = function (sheetName) {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return [];
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    const seen = {};
+    sheet.getRange(2, 2, lastRow - 1, 1).getDisplayValues().forEach(function (row) {
+      const t = String(row[0] || "").trim().toUpperCase();
+      if (t) seen[t] = true;
+    });
+    return Object.keys(seen).sort();
+  };
+
+  return { usd: read("TXs_USD"), etf: read("TXs_ETF"), ron: read("TXs_RON") };
+}
+
 // ── DEPOSITS ──────────────────────────────────────────────────────────────
 // Cash-in ledgers, one per investing bucket, kept newest-first like the TX tabs:
 //   DEPs_USD  (Stocks) — columns: Amount | Date
