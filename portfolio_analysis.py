@@ -796,6 +796,14 @@ def portfolio_changed(signature):
     return changed
 
 # ── INVESTMENT INCOME ─────────────────────────────────────────────────────────
+# CURRENTLY UNUSED — the weekly report's "Investment Income YTD" section was
+# dropped on 2026-07-26 because the broker CSV exports (XTB / TradeVille / ING)
+# that feed investment_income.db are no longer being added, so the YTD figures
+# had gone stale (2026 has Q1 only). Kept intact, along with parse_broker_csv.py
+# and utils/taxes/, so the section can be restored by re-importing the CSVs and
+# re-wiring the three call sites: this loader, the "### Investment Income YTD"
+# block in SONNET_USER, and the numbered section in both analysis_scope prompts
+# (plus the template section and the Haiku section count).
 def load_income_summary():
     """Load YTD investment income from the broker DB. Returns formatted text."""
     try:
@@ -1015,10 +1023,6 @@ tax_data  = build_tax_table(tx_rows, {k: k for k in _REQUIRED_TX}, TODAY) if tx_
 tax_table = format_tax_table(tax_data)
 print(f"[{TODAY_STR}] Tax table:\n{tax_table}")
 
-print(f"[{TODAY_STR}] Loading investment income...")
-income_summary = load_income_summary()
-print(f"[{TODAY_STR}] Income summary:\n{income_summary}")
-
 print(f"[{TODAY_STR}] Fetching RSS feeds...")
 news_digest = fetch_all_news(symbols)
 
@@ -1035,31 +1039,29 @@ is_full   = portfolio_changed(signature)
 
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — 7 sections only:
+    analysis_scope = """Perform a FULL analysis — 6 sections only:
 1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
 2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. When news drives the call, fold ONE short news-driver clause into that stock's rationale (<=12 words, e.g. "insider buying supports hold"). Per-ticker news lives HERE, nowhere else. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
 3. Global News — 3-5 items from digest
 4. Romania News — from digest
 5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 6. Watchlist & Alerts — 3-5 opportunities or risks
-7. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency.
 No separate stock-specific news section — per-ticker news belongs inside each stock's Section 2 rationale, stated once and never repeated elsewhere.
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, Investment Income / YTD income section."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
     analysis_scope = """Portfolio UNCHANGED. Section 1: one-line summary only, including the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
-Focus on sections 2-7 in full detail:
+Focus on sections 2-6 in full detail:
 2. Individual Stocks — positions unchanged, so skip the tax-bracket recompute; for each US stock give the current buy/sell/hold and, when news drives the call, ONE short news-driver clause (<=12 words). Per-ticker news lives HERE — do NOT create a separate stock-specific news section.
 3. Global News — 3-5 items from digest
 4. Romania News — from digest
 5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
 6. Watchlist & Alerts — 3-5 opportunities or risks
-7. Investment Income YTD — per currency: dividends (gross/net/withheld), realized gains (gross/net/tax), interest. Note RO gov bonds separately as tax-exempt. Keep it factual, no narrative.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency (USD for US stocks, RON for Romanian stocks).
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes."""
+Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, Investment Income / YTD income section."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────
 # Load prior calls (memory) so stances stay consistent week-to-week instead of
@@ -1110,9 +1112,6 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 ### Tax brackets (pre-computed FIFO from Tranzactii — use these, do not recompute)
 {tax_table}
-
-### Investment Income YTD {TODAY.year} (all brokers, all accounts)
-{income_summary}
 
 ### Weekly Performance vs S&P 500
 {weekly_comparison}
@@ -1170,7 +1169,7 @@ HAIKU_USER = f"""Render the portfolio analysis below into HTML by reproducing th
 
 Rules:
 - Copy the template's <style> block verbatim — same colours, fonts, spacing, class names.
-- Keep the same 7 sections in the same order with the same headings and numbering.
+- Keep the same 6 sections in the same order with the same headings and numbering.
 - Reuse the template's component patterns: .summary-box rows, the holdings <table>, .stock-detail cards
   grouped under "Sell Recommendations" / "Hold Recommendations", .section-intro callouts,
   .alert / .alert.opportunity / .alert.sell cards, and .summary-row lists.

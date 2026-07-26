@@ -20,13 +20,13 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `SKILL.md` | Investor profile, portfolio rules, tax rules |
 | `.github/workflows/portfolio_analysis.yml` | GitHub Actions cron: runs Mondays 08:00 UTC |
 | `seen_articles.db` | SQLite cache of article URLs (prevents duplicates across weekly runs) |
-| `parse_broker_csv.py` | Parses broker CSV exports (XTB, TradeVille, ING) and stores transactions in SQLite |
+| `parse_broker_csv.py` | Parses broker CSV exports (XTB, TradeVille, ING) and stores transactions in SQLite. **Not currently wired into the report** — see Investment Income below |
 | `clasp/` | Google Apps Script source files, managed with clasp CLI |
 | `clasp/automation.js` | Daily portfolio snapshot recording (ETF, Stocks, NetWorth history sheets) |
 | `clasp/chart.js` | Server-side Apps Script exposing data to the web dashboard |
 | `clasp/chart_page.html` | Interactive web dashboard frontend (Chart.js, dark theme, zoom/pan) + Library tab |
 | `clasp/reports.js` | Weekly Analysis Library: Gmail→Drive importer + dashboard read API (listReports/getReportHtml) |
-| `utils/taxes/<year>/` | Per-year broker CSV exports and `investment_income.db` SQLite database |
+| `utils/taxes/<year>/` | Per-year broker CSV exports and `investment_income.db` SQLite database. Stalled at 2026 Q1 |
 
 ## API Cost Target
 
@@ -45,6 +45,24 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
 5. **Analyze:** Claude Sonnet (portfolio + news + newsletter context, includes weekly ETF vs S&P 500 comparison)
 6. **Render:** Claude Haiku converts analysis to HTML
 7. **Distribute:** Email report + GitHub artifact
+
+## Report Sections
+
+The report is **6 sections**, pinned to `report_template.html`: 1. Portfolio Overview,
+2. Individual Stocks, 3. Global News, 4. Romania News, 5. Crypto / Bitcoin,
+6. Watchlist & Action Items. The count is asserted in three places that must stay in
+sync: both `analysis_scope` prompts, the Haiku "Keep the same N sections" rule, and the
+template's `<h2>` numbering.
+
+### Investment Income (removed 2026-07-26)
+
+A 7th section, "Investment Income YTD", was dropped because the XTB / TradeVille / ING
+CSV exports feeding `investment_income.db` are no longer being added, leaving the YTD
+figures stale at 2026 Q1. `parse_broker_csv.py`, `utils/taxes/` and
+`load_income_summary()` are all kept intact — restoring the section means re-importing
+the CSVs and re-wiring the call sites listed in the comment above
+`load_income_summary()`. Note this is unrelated to the **FIFO tax table**, which reads
+the Google Sheets `TX_SHEETS` tabs and is still live.
 
 ## Mode Switching
 
