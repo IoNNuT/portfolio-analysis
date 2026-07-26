@@ -141,6 +141,10 @@
             color: #17a2b8;
             font-weight: 600;
         }
+        .action-buy {
+            color: #28a745;
+            font-weight: 600;
+        }
         .summary-box {
             background: #f5f5f5;
             padding: 15px;
@@ -272,11 +276,13 @@
 
         <h3>Sell Recommendations</h3>
         <!-- repeat one .stock-detail per SELL position -->
+        <!-- 2nd .stock-meta line carries the live fundamentals — always include it -->
         <div class="stock-detail">
             <strong>PTCT — PTC Therapeutics</strong><br>
             Price: $68.81 | Shares: 4 | MV: $275 | P&amp;L: <span class="positive">+$79 / +40.2%</span>
             <div class="stock-meta">Cost: $49.09 | &gt;365 days | In profit</div>
-            <div class="stock-action"><span class="action-sell">ACTION: SELL</span> — Meets both sell triggers (&gt;365 days, in profit). Realize at 3% tax rate.</div>
+            <div class="stock-meta">Fwd P/E 22.4 | PEG 1.9 | Rev growth <span class="negative">-3.1%</span> | Margin +8.2% | Target $61.00 (hold) | Earnings 2026-08-12</div>
+            <div class="stock-action"><span class="action-sell">ACTION: SELL</span> — Meets both sell triggers (&gt;365 days, in profit). Revenue contracting and trading above the analyst target. Realize at 3% tax rate.</div>
         </div>
 
         <h3>Hold Recommendations</h3>
@@ -285,36 +291,36 @@
             <strong>AMZN — Amazon</strong><br>
             Price: $266.32 | Shares: 2 | MV: $533 | P&amp;L: <span class="positive">+$66 / +14.1%</span>
             <div class="stock-meta">Cost: $233.51 | Core long-term position</div>
-            <div class="stock-action"><span class="action-hold">ACTION: HOLD</span> — Cloud + AI story intact. No negative fundamental signal.</div>
+            <div class="stock-meta">Fwd P/E 31.2 | PEG 2.4 | Rev growth <span class="positive">+40.2%</span> | Margin +9.6% | Target $250.00 (strong buy) | Earnings 2026-10-30</div>
+            <div class="stock-action"><span class="action-hold">ACTION: HOLD</span> — Cloud + AI story intact, growth still compounding at 40%. Trading slightly above target; no negative fundamental signal.</div>
         </div>
 
         <!-- ============================================================= -->
-        <!-- SECTION 3 — Global News                                       -->
+        <!-- SECTION 3 — New US Positions (BUY candidates, not held)        -->
+        <!-- .stock-detail cards with .action-buy; 2-3 of them              -->
         <!-- ============================================================= -->
-        <h2>3. Global News</h2>
-        <ul>
-            <li><strong>Oil prices falling:</strong> Potential macro positive for inflation/rates globally; lower energy input costs benefiting equities broadly.</li>
-            <li><strong>Fed constraint:</strong> Rates-higher-for-longer risk remains. Relevant for bond duration and growth-stock valuations.</li>
-        </ul>
+        <h2>3. New US Positions</h2>
+        <div class="section-intro">
+            Screened against the buy criteria: large-cap, high-conviction, strong long-term growth, no dividend preferred.
+        </div>
+
+        <div class="stock-detail">
+            <strong>TSM — Taiwan Semiconductor</strong> — foundry for essentially every leading-edge AI chip.<br>
+            <div class="stock-meta">Fwd P/E 19.8 | PEG 0.9 | Rev growth <span class="positive">+33.4%</span> | Margin +42.1% | Target $305.00 (strong buy) | Div yield 1.10%</div>
+            <div class="stock-action"><span class="action-buy">ACTION: BUY</span> — Cheapest large-cap way to own AI capex at a PEG below 1. Small dividend is a mild negative against the 16% tax but does not offset the growth case.</div>
+        </div>
+
+        <div class="stock-detail">
+            <strong>NOW — ServiceNow</strong> — enterprise workflow software, expanding into AI agents.<br>
+            <div class="stock-meta">Fwd P/E 54.2 | PEG 2.8 | Rev growth <span class="positive">+21.7%</span> | Margin +13.0% | Target $1,180.00 (buy) | Div yield n/a</div>
+            <div class="stock-action"><span class="action-buy">ACTION: WATCH</span> — Fits the no-dividend, high-growth profile, but a fwd P/E in the 50s leaves no margin for error. Revisit under $900 or after next earnings.</div>
+        </div>
 
         <!-- ============================================================= -->
-        <!-- SECTION 4 — Romania News                                      -->
-        <!-- ============================================================= -->
-        <h2>4. Romania News</h2>
-        <p>No material financial/market news from the Romanian digest this week. None portfolio-relevant.</p>
-
-        <!-- ============================================================= -->
-        <!-- SECTION 5 — Crypto / Bitcoin                                  -->
-        <!-- 1 short paragraph outlook                                     -->
-        <!-- ============================================================= -->
-        <h2>5. Crypto / Bitcoin</h2>
-        <p>Bitcoin under selling pressure this week — spot ETF outflows hit a record while AI equities rally, suggesting capital rotation out of crypto into equities. No portfolio exposure; no action required, but worth monitoring for broader contagion.</p>
-
-        <!-- ============================================================= -->
-        <!-- SECTION 6 — Watchlist & Alerts                                -->
+        <!-- SECTION 4 — Watchlist & Alerts (existing book)                -->
         <!-- .alert cards: .alert.opportunity / .alert.sell / plain .alert -->
         <!-- ============================================================= -->
-        <h2>6. Watchlist &amp; Action Items</h2>
+        <h2>4. Watchlist &amp; Action Items</h2>
 
         <div class="alert opportunity">
             <strong>💡 OPPORTUNITY:</strong> EUNA.DE (Bonds ETF) is -3% underweight vs 10% target. Prioritize in next 1-2 monthly ETF buys.
@@ -324,9 +330,28 @@
             <strong>⚠️ ALERT:</strong> Positions flagged for sale: PTCT, OTEX, LULU, OSPN. Freeing this capital removes drag and enables redeployment.
         </div>
 
-        <!-- Section 7 (Investment Income YTD) was removed on 2026-07-26 — the  -->
-        <!-- broker CSV exports feeding investment_income.db are no longer being -->
-        <!-- added, so the YTD figures had gone stale. The report is 6 sections. -->
+        <div class="alert">
+            <strong>⏳ TAX TIMING:</strong> CRM lot of 2 shares crosses 365 days on 2026-08-14 — 6% drops to 3% after that date.
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- SECTION 5 — Macro Context                                     -->
+        <!-- Merged Global News + Romania + Crypto. SHORTEST section:       -->
+        <!-- max 2 short paragraphs + up to 5 bullets. No subsections.     -->
+        <!-- ============================================================= -->
+        <h2>5. Macro Context</h2>
+        <p>Rates-higher-for-longer remains the main constraint on growth-stock multiples; falling oil is a mild offset via input costs. Nothing this week changes the thesis on any held position.</p>
+        <ul>
+            <li><strong>Fed:</strong> No cut priced before Q4 — keeps pressure on the high-multiple names in Section 2.</li>
+            <li><strong>Romania:</strong> No material market news in the digest this week; BET ETF and gov bonds unaffected.</li>
+            <li><strong>Crypto:</strong> Bitcoin under pressure on record spot-ETF outflows, suggesting rotation into AI equities. No portfolio exposure; no action.</li>
+        </ul>
+
+        <!-- Section 7 (Investment Income YTD) was removed on 2026-07-26 — the   -->
+        <!-- broker CSV exports feeding investment_income.db are no longer being  -->
+        <!-- added, so the YTD figures had gone stale. Global News / Romania News -->
+        <!-- / Crypto were merged into Section 5 on the same date, to put the     -->
+        <!-- report's weight on US stock decisions. The report is 5 sections.     -->
 
         <div class="footer">
             <p>Report generated: 2026-05-25 | Data current as of report date | This analysis is for informational purposes only and does not constitute financial advice.</p>

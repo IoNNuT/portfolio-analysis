@@ -38,25 +38,48 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
 1. **Fetch:** Google Sheets (CSV API) → Summary, Utilities, Tranzactii sheets
 2. **Compute:** FIFO tax table from transaction history
 3. **Scrape:** RSS feeds (ticker-specific + macro news) + S&P 500 weekly performance via Yahoo Finance
-4. **Newsletters:** Pull subscribed newsletters from iCloud Mail (IMAP, by sender), dedup against
-   the article cache, then Haiku-distill each into ~5 portfolio-relevant bullets. Folded into the
-   Global News, per-stock Section 2 rationale, and Watchlist sections — no separate report section. Optional: skipped silently
+4. **Fundamentals:** Per-held-stock valuation snapshot from Yahoo `quoteSummary` — fwd P/E, PEG,
+   revenue and EPS growth, margin, analyst target, next earnings date. No LLM cost (one HTTP
+   request per ticker). Cited in the Section 2 rationales. Degrades to a marker line on failure,
+   per-ticker, so a Yahoo change can't break the run. See `fetch_fundamentals`.
+5. **Newsletters:** Pull subscribed newsletters from iCloud Mail (IMAP, by sender), dedup against
+   the article cache, then Haiku-distill each into ~5 portfolio-relevant bullets. Folded into
+   Section 3 (New US Positions), the per-stock Section 2 rationale, the Watchlist, and Section 5
+   (Macro Context) — no separate report section. Optional: skipped silently
    if iCloud creds are absent. See `NEWSLETTER_SENDERS` / `fetch_newsletters`.
-5. **Analyze:** Claude Sonnet (portfolio + news + newsletter context, includes weekly ETF vs S&P 500 comparison)
-6. **Render:** Claude Haiku converts analysis to HTML
-7. **Distribute:** Email report + GitHub artifact
+6. **Analyze:** Claude Sonnet (portfolio + fundamentals + news + newsletter context, includes weekly ETF vs S&P 500 comparison)
+7. **Render:** Claude Haiku converts analysis to HTML
+8. **Distribute:** Email report + GitHub artifact
 
 ## Report Sections
 
-The report is **6 sections**, pinned to `report_template.html`: 1. Portfolio Overview,
-2. Individual Stocks, 3. Global News, 4. Romania News, 5. Crypto / Bitcoin,
-6. Watchlist & Action Items. The count is asserted in three places that must stay in
+The report is **5 sections**, pinned to `report_template.html`: 1. Portfolio Overview,
+2. Individual Stocks, 3. New US Positions, 4. Watchlist & Action Items,
+5. Macro Context. The count is asserted in three places that must stay in
 sync: both `analysis_scope` prompts, the Haiku "Keep the same N sections" rule, and the
 template's `<h2>` numbering.
 
-### Investment Income (removed 2026-07-26)
+**The report's purpose is US stock decisions**, and the structure enforces that: Sections 2
+and 3 carry the depth, Section 5 is explicitly capped at 2 paragraphs + 5 bullets. When
+editing prompts, don't let macro coverage expand back out — it was 3 separate sections
+(Global News, Romania News, Crypto) before 2026-07-26 and consumed roughly half the report.
 
-A 7th section, "Investment Income YTD", was dropped because the XTB / TradeVille / ING
+Two coupled invariants worth knowing before touching the prompts:
+
+- **News budget.** `NEWS_BUDGET` gives per-category floors (stocks 18, general 6, Romania 3,
+  crypto 3) instead of the old single `MAX_ITEMS_TOTAL=30` trimmed proportionally, which had
+  left the whole equity book with 12 of 29 items. `_interleave` round-robins across ticker
+  feeds so every position gets a headline before any gets a third.
+- **Recommendations memory excludes Section 3.** The `REC_INSTRUCTION` block is replayed next
+  week as "your previous calls", so a Section 3 candidate leaking into it would be mistaken
+  for a held position. The instruction says this explicitly — keep that guard if you edit it.
+
+### Removed sections (both 2026-07-26)
+
+**Global News / Romania News / Crypto** were merged into the single capped Section 5
+(Macro Context), freeing room for per-stock depth and the new Section 3.
+
+**Investment Income YTD** was dropped because the XTB / TradeVille / ING
 CSV exports feeding `investment_income.db` are no longer being added, leaving the YTD
 figures stale at 2026 Q1. `parse_broker_csv.py`, `utils/taxes/` and
 `load_income_summary()` are all kept intact — restoring the section means re-importing

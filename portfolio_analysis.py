@@ -76,8 +76,20 @@ MACRO_KEYWORDS = [
     "Trump", "Musk",
 ]
 
-MAX_ITEMS_TOTAL = 30
-MAX_PER_FEED    = 3
+MAX_PER_FEED = 3
+
+# Per-category item budgets, replacing the old single MAX_ITEMS_TOTAL=30 cap.
+# That cap was trimmed proportionally across categories, which handed the seven
+# macro feeds ~11 slots and left the whole equity book with 12 — roughly 1.5
+# headlines per position. The report's job is US stock advice, so stocks now get
+# a guaranteed floor and macro is capped rather than competing for the same pool.
+# Total stays ~30 to hold the Sonnet prompt (and cost) roughly flat.
+NEWS_BUDGET = {
+    "Individual Stocks":      18,
+    "General Financial News":   6,
+    "Romania":                  3,
+    "Crypto":                   3,
+}
 
 # ── NEWSLETTERS (iCloud) ────────────────────────────────────────────────────────
 # Subscribed newsletters land on iCloud Mail. They're pulled by sender, deduped
@@ -466,13 +478,46 @@ def parse_date(s):
     return None
 
 # ── SYMBOL EXTRACTION ─────────────────────────────────────────────────────────
-def extract_symbols(summary_rows, cols):
-    if not cols.get("ticker"):
+def extract_stock_symbols(summary_text):
+    """US stock tickers only — the positions the report gives buy/sell/hold calls on.
+
+    The Summary sheet stacks four tables into one CSV (ETF, Stocks, BET, bonds),
+    so reading every "Ticker" cell via parse_csv's row-0 header returns 19 values
+    for a 7-stock book: the ETFs, TVBETETF.RO, the Romanian bond codes, and the
+    Stocks table's own header row read as data (the literal string "TICKER").
+    That polluted both the per-ticker news feeds (11 dead Yahoo requests a run)
+    and the newsletter relevance filter, which was matching articles against
+    bond codes.
+
+    Locate the Stocks table by its header — the only one carrying a "Weekly
+    Change" column — and read down to the footer (first blank ticker), the same
+    way the dashboard's getStockHoldings does. Returns [] if the table isn't
+    found, which degrades to macro-only news rather than failing the run.
+    """
+    if not summary_text or summary_text.startswith("["):
         return []
+
+    rows = list(csv.reader(io.StringIO(summary_text)))
+    norm = lambda c: c.replace("\n", " ").strip()
+
+    header_row, idx_ticker = -1, -1
+    for i, row in enumerate(rows):
+        cells = [norm(c) for c in row]
+        if "Ticker" in cells and "Weekly Change" in cells:
+            header_row, idx_ticker = i, cells.index("Ticker")
+            break
+    if header_row == -1:
+        print(f"[{TODAY_STR}] Warning: Stocks table not found in Summary — no per-ticker news")
+        return []
+
     seen, out = set(), []
-    for row in summary_rows:
-        sym = (row.get(cols["ticker"]) or "").strip().upper()
-        if sym and sym not in seen:
+    for row in rows[header_row + 1:]:
+        if len(row) <= idx_ticker:
+            break
+        sym = row[idx_ticker].strip().upper()
+        if not sym:
+            break                      # blank ticker = footer/total row → table ends
+        if sym not in seen:
             seen.add(sym)
             out.append(sym)
     return out
@@ -600,6 +645,23 @@ def build_ticker_feeds(symbols):
     """One Yahoo Finance feed per actively held ticker."""
     return [(sym, f"https://finance.yahoo.com/rss/headline?s={sym}") for sym in symbols]
 
+def _interleave(per_feed, limit):
+    """Round-robin merge of per-feed item lists, capped at `limit`.
+
+    Truncating the concatenated list instead would spend the whole budget on the
+    first few feeds — with 7 tickers at 3 items each against an 18-item budget,
+    the last ticker would contribute nothing. Round-robin gives every ticker its
+    first headline before any ticker gets a second.
+    """
+    out = []
+    for rank in range(MAX_PER_FEED):
+        for items in per_feed:
+            if len(out) >= limit:
+                return out
+            if rank < len(items):
+                out.append(items[rank])
+    return out
+
 def fetch_all_news(symbols):
     conn = init_db()
     feeds = dict(RSS_FEEDS_STATIC)
@@ -609,20 +671,16 @@ def fetch_all_news(symbols):
     sections, total = {}, 0
     for category, feed_list in feeds.items():
         filter_macro = category == "General Financial News"
-        items = []
-        for label, url in feed_list:
-            items.extend(fetch_feed(label, url, conn, filter_macro=filter_macro))
+        per_feed = [fetch_feed(label, url, conn, filter_macro=filter_macro)
+                    for label, url in feed_list]
+        items = _interleave(per_feed, NEWS_BUDGET.get(category, MAX_PER_FEED))
         sections[category] = items
         total += len(items)
     conn.close()
 
-    if total > MAX_ITEMS_TOTAL:
-        ratio = MAX_ITEMS_TOTAL / total
-        for cat in sections:
-            sections[cat] = sections[cat][:max(1, int(len(sections[cat]) * ratio))]
-        total = sum(len(v) for v in sections.values())
-
-    print(f"[{TODAY_STR}] Total news items: {total}")
+    stock_count = len(sections.get("Individual Stocks", []))
+    print(f"[{TODAY_STR}] Total news items: {total} "
+          f"({stock_count} stock-specific, {total - stock_count} macro/other)")
     lines = [f"# News Digest — {TODAY_STR} ({total} items)\n"]
     for category, items in sections.items():
         if not items:
@@ -858,6 +916,108 @@ def load_income_summary():
 
     return "\n".join(lines) if len(lines) > 1 else "[No investment income recorded yet]"
 
+# ── STOCK FUNDAMENTALS (Yahoo quoteSummary) ──────────────────────────────────
+# Valuation and growth inputs for the per-stock buy/sell/hold calls. Without
+# these the analysis sees only price, P&L and the FIFO tax split — enough to
+# judge tax timing, not enough to judge whether a company is worth holding, and
+# not enough to apply SKILL.md's buy criteria (large, high-growth, no dividends).
+#
+# No LLM cost: one HTTP request per held ticker, folded into the Sonnet prompt as
+# plain text. Degrades the same way the newsletter block does — a failed fetch
+# yields a marker line and the report still sends, so an upstream Yahoo change
+# can't break the weekly run.
+FUNDAMENTAL_MODULES = "defaultKeyStatistics,financialData,calendarEvents,summaryDetail"
+
+def _fmt_ratio(v, suffix=""):
+    """Yahoo returns either a raw number or {'raw': n, 'fmt': '...'}; may be absent."""
+    if isinstance(v, dict):
+        if v.get("fmt"):
+            return str(v["fmt"])
+        v = v.get("raw")
+    if v is None or v == {}:
+        return "n/a"
+    if isinstance(v, (int, float)):
+        return f"{v:,.2f}{suffix}"
+    return str(v)
+
+def _fmt_pct(v, signed=True):
+    """Yahoo growth/margin fields are fractions (0.184 → +18.4%). `signed=False`
+    for quantities that can't go negative, where a leading '+' is just noise."""
+    if isinstance(v, dict):
+        v = v.get("raw")
+    if v is None or not isinstance(v, (int, float)):
+        return "n/a"
+    return f"{v * 100:+.1f}%" if signed else f"{v * 100:.2f}%"
+
+def _fetch_one_fundamental(sym):
+    """Valuation snapshot for one ticker, or None if unavailable."""
+    url = (f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+           f"{requests.utils.quote(sym)}?modules={FUNDAMENTAL_MODULES}")
+    r = requests.get(url, headers=FEED_HEADERS, timeout=15)
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code}")
+    result = (r.json().get("quoteSummary") or {}).get("result") or []
+    if not result:
+        raise RuntimeError("empty result")
+    blocks = result[0]
+    stats = blocks.get("defaultKeyStatistics") or {}
+    fin   = blocks.get("financialData")        or {}
+    cal   = blocks.get("calendarEvents")       or {}
+    detail = blocks.get("summaryDetail")       or {}
+
+    earnings = "n/a"
+    dates = ((cal.get("earnings") or {}).get("earningsDate")) or []
+    if dates:
+        d = dates[0]
+        raw = d.get("raw") if isinstance(d, dict) else d
+        if isinstance(raw, (int, float)):
+            earnings = datetime.datetime.fromtimestamp(
+                raw, datetime.timezone.utc).date().isoformat()
+        elif isinstance(d, dict) and d.get("fmt"):
+            earnings = str(d["fmt"])
+
+    return {
+        "fwd_pe":       _fmt_ratio(fin.get("forwardPE") or detail.get("forwardPE") or stats.get("forwardPE")),
+        "trail_pe":     _fmt_ratio(detail.get("trailingPE")),
+        "peg":          _fmt_ratio(stats.get("pegRatio")),
+        "rev_growth":   _fmt_pct(fin.get("revenueGrowth")),
+        "earn_growth":  _fmt_pct(fin.get("earningsGrowth")),
+        "margin":       _fmt_pct(fin.get("profitMargins") or stats.get("profitMargins")),
+        "target":       _fmt_ratio(fin.get("targetMeanPrice")),
+        "reco":         str(fin.get("recommendationKey") or "n/a"),
+        "div_yield":    _fmt_pct(detail.get("dividendYield"), signed=False),
+        "earnings":     earnings,
+    }
+
+def fetch_fundamentals(symbols):
+    """Per-ticker valuation table for the Sonnet prompt. Never raises."""
+    if not symbols:
+        return "[No US stock positions]"
+
+    rows, failed = [], []
+    for sym in symbols:
+        try:
+            f = _fetch_one_fundamental(sym)
+        except Exception as e:
+            failed.append(f"{sym} ({e})")
+            continue
+        rows.append(
+            f"{sym} | fwd P/E {f['fwd_pe']} | trail P/E {f['trail_pe']} | PEG {f['peg']} | "
+            f"rev growth {f['rev_growth']} | EPS growth {f['earn_growth']} | "
+            f"margin {f['margin']} | analyst target {f['target']} ({f['reco']}) | "
+            f"div yield {f['div_yield']} | next earnings {f['earnings']}"
+        )
+
+    if failed:
+        print(f"[{TODAY_STR}] Warning: fundamentals unavailable for {', '.join(failed)}")
+    if not rows:
+        return "[Fundamentals unavailable this run — judge on price action, P&L and tax brackets only]"
+
+    out = ["Per-stock fundamentals (Yahoo Finance, live):"] + rows
+    if failed:
+        out.append(f"(unavailable: {', '.join(s.split(' (')[0] for s in failed)})")
+    return "\n".join(out)
+
 # ── WEEKLY PERFORMANCE COMPARISON ────────────────────────────────────────────
 def _fetch_sp500_weekly_change():
     try:
@@ -999,8 +1159,8 @@ summary_headers, summary_rows = parse_csv(summary_csv)
 summary_cols = resolve_columns(summary_headers, SUMMARY_COL_HINTS)
 print(f"[{TODAY_STR}] Summary cols resolved: {summary_cols}")
 
-symbols = extract_symbols(summary_rows, summary_cols)
-print(f"[{TODAY_STR}] Symbols from Summary: {symbols}")
+symbols = extract_stock_symbols(summary_csv)
+print(f"[{TODAY_STR}] US stock symbols from Summary: {symbols}")
 
 # Build the FIFO tax table from the clean per-portfolio transaction tabs, unioned.
 # Each tab resolves its own columns; rows are normalized to canonical keys so tabs
@@ -1023,6 +1183,10 @@ tax_data  = build_tax_table(tx_rows, {k: k for k in _REQUIRED_TX}, TODAY) if tx_
 tax_table = format_tax_table(tax_data)
 print(f"[{TODAY_STR}] Tax table:\n{tax_table}")
 
+print(f"[{TODAY_STR}] Fetching stock fundamentals...")
+fundamentals = fetch_fundamentals(symbols)
+print(f"[{TODAY_STR}] Fundamentals:\n{fundamentals}")
+
 print(f"[{TODAY_STR}] Fetching RSS feeds...")
 news_digest = fetch_all_news(symbols)
 
@@ -1039,29 +1203,29 @@ is_full   = portfolio_changed(signature)
 
 if is_full:
     print(f"[{TODAY_STR}] Mode: FULL")
-    analysis_scope = """Perform a FULL analysis — 6 sections only:
-1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
-2. Individual Stocks — per stock: long/short share split, tax bracket, buy/sell/hold. When news drives the call, fold ONE short news-driver clause into that stock's rationale (<=12 words, e.g. "insider buying supports hold"). Per-ticker news lives HERE, nowhere else. Show values in their ORIGINAL currency (USD for US stocks, RON for Romanian stocks). Do NOT convert individual stock values to EUR.
-3. Global News — 3-5 items from digest
-4. Romania News — from digest
-5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
-6. Watchlist & Alerts — 3-5 opportunities or risks
+    analysis_scope = """Perform a FULL analysis — 5 sections only. This report exists to drive
+US stock decisions: Sections 2 and 3 are the point of it, and should carry most of the depth and word count.
+
+1. Portfolio Overview — total value EUR, all holdings in one compact table. Include the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each). Keep this tight — it is context, not analysis.
+2. Individual Stocks — the core section. Per stock: long/short share split, tax bracket, buy/sell/hold, and a rationale that cites the fundamentals provided (fwd P/E, PEG, revenue and EPS growth, margin, analyst target vs current price, next earnings date). State the valuation case explicitly — do not give a call on price action alone. Flag any stock whose next earnings date falls within 14 days. When news drives the call, fold ONE short news-driver clause into that stock's rationale (<=12 words, e.g. "insider buying supports hold"). Per-ticker news lives HERE, nowhere else. Show values in their ORIGINAL currency (USD), and do NOT convert individual stock values to EUR.
+3. New US Positions — 2-3 concrete BUY candidates NOT currently held, screened against the investor's stated buy criteria (large, high-conviction companies with strong long-term growth; dividends are a negative given the 16% dividend tax). For each: ticker, what it does in one clause, the growth/valuation case in numbers where you have them, and why it fits this portfolio now. Say plainly if a candidate is a watch-not-buy at today's price. If the news and newsletter material genuinely supports no new names this week, say so in one line rather than padding to three.
+4. Watchlist & Alerts — 3-5 opportunities or risks in the EXISTING book. Tax-timing triggers (a lot crossing 365 days) belong here.
+5. Macro Context — ONE compact section, max 2 short paragraphs plus up to 5 bullets total, covering global markets, Romania, and crypto/BTC together. Only include what plausibly affects the holdings or the buy candidates above. This is the shortest section in the report; do not expand it into per-topic subsections.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency.
 No separate stock-specific news section — per-ticker news belongs inside each stock's Section 2 rationale, stated once and never repeated elsewhere.
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, Investment Income / YTD income section."""
+Do NOT include: separate ETF section, separate Romania portfolio section, separate Global News / Romania News / Crypto sections (they are merged into Section 5), tax notes, Investment Income / YTD income section."""
 else:
     print(f"[{TODAY_STR}] Mode: INCREMENTAL")
     analysis_scope = """Portfolio UNCHANGED. Section 1: one-line summary only, including the weekly ETF vs S&P 500 comparison AND Stocks portfolio vs S&P 500 comparison from the data provided (1 line each).
-Focus on sections 2-6 in full detail:
-2. Individual Stocks — positions unchanged, so skip the tax-bracket recompute; for each US stock give the current buy/sell/hold and, when news drives the call, ONE short news-driver clause (<=12 words). Per-ticker news lives HERE — do NOT create a separate stock-specific news section.
-3. Global News — 3-5 items from digest
-4. Romania News — from digest
-5. Crypto / Bitcoin — BTC price trend, key news from digest, brief outlook (1 paragraph)
-6. Watchlist & Alerts — 3-5 opportunities or risks
+Focus on sections 2-4 in full detail — this report exists to drive US stock decisions, so that is where the depth goes. 5 sections total:
+2. Individual Stocks — the core section. Positions unchanged, so skip the tax-bracket recompute; for each US stock give the current buy/sell/hold with a rationale that cites the fundamentals provided (fwd P/E, PEG, revenue and EPS growth, margin, analyst target vs current price, next earnings date). Call out any change in the valuation picture since last week, and flag any stock whose next earnings date falls within 14 days. When news drives the call, ONE short news-driver clause (<=12 words). Per-ticker news lives HERE — do NOT create a separate stock-specific news section.
+3. New US Positions — 2-3 concrete BUY candidates NOT currently held, screened against the investor's stated buy criteria (large, high-conviction companies with strong long-term growth; dividends are a negative given the 16% dividend tax). For each: ticker, what it does in one clause, the growth/valuation case in numbers where you have them, and why it fits this portfolio now. Say plainly if a candidate is a watch-not-buy at today's price. If the material genuinely supports no new names this week, say so in one line rather than padding to three.
+4. Watchlist & Alerts — 3-5 opportunities or risks in the EXISTING book. Tax-timing triggers (a lot crossing 365 days) belong here.
+5. Macro Context — ONE compact section, max 2 short paragraphs plus up to 5 bullets total, covering global markets, Romania, and crypto/BTC together. Only include what plausibly affects the holdings or the buy candidates above. This is the shortest section in the report; do not expand it into per-topic subsections.
 
 Currency rule: Use EUR only for portfolio-level totals and cross-portfolio comparisons. Individual stock values stay in their original currency (USD for US stocks, RON for Romanian stocks).
-Do NOT include: separate ETF section, separate Romania portfolio section, tax notes, Investment Income / YTD income section."""
+Do NOT include: separate ETF section, separate Romania portfolio section, separate Global News / Romania News / Crypto sections (they are merged into Section 5), tax notes, Investment Income / YTD income section."""
 
 # ── STEP 1: SONNET ANALYSIS ───────────────────────────────────────────────────
 # Load prior calls (memory) so stances stay consistent week-to-week instead of
@@ -1084,18 +1248,23 @@ REC_INSTRUCTION = (
     "Include one object for EVERY US individual stock in the holdings (exclude ETFs, bonds, "
     "and Romanian holdings). stance must be one of BUY, ADD, HOLD, TRIM, SELL. Use plain numbers "
     "for price and pnl_pct (no $ or %). This block is metadata only and must NOT appear anywhere "
-    "in the report sections above."
+    "in the report sections above.\n"
+    "CRITICAL: include ONLY positions actually held. Do NOT add the candidate tickers you "
+    "proposed in Section 3 (New US Positions) — this block is replayed to you next week as "
+    "your standing calls on the book, so a candidate listed here would be mistaken for a "
+    "position you own."
 )
 
 SONNET_SYSTEM = SKILL_CONTENT + "\n\n---\n\n" + ROMANIAN_TAX_CONTENT
 
-# Newsletter insights are folded into the existing Global News / per-stock Section 2
-# rationale / Watchlist sections — no separate report section. Empty when nothing new
-# came in this week.
+# Newsletter insights are folded into the existing sections — no separate report
+# section. Section 3 (New US Positions) is listed first because newsletters are the
+# richest source of names not already held. Empty when nothing new came in this week.
 newsletter_block = (
     "\n### Newsletter insights (distilled from subscribed newsletters)\n"
-    "Use these to inform the Global News, the per-stock rationale in Section 2 (Individual "
-    "Stocks), and the Watchlist section — do NOT create a separate newsletter or "
+    "Use these to inform Section 3 (New US Positions — newsletters are your best source "
+    "of candidate names), the per-stock rationale in Section 2 (Individual Stocks), the "
+    "Watchlist, and Section 5 (Macro Context) — do NOT create a separate newsletter or "
     "stock-specific news section.\n"
     f"{newsletter_digest}\n"
     if newsletter_digest else ""
@@ -1112,6 +1281,9 @@ Use short labeled sections. Be concise, use numbers not prose.
 
 ### Tax brackets (pre-computed FIFO from Tranzactii — use these, do not recompute)
 {tax_table}
+
+### US stock fundamentals (live — cite these in the Section 2 rationales)
+{fundamentals}
 
 ### Weekly Performance vs S&P 500
 {weekly_comparison}
@@ -1169,7 +1341,7 @@ HAIKU_USER = f"""Render the portfolio analysis below into HTML by reproducing th
 
 Rules:
 - Copy the template's <style> block verbatim — same colours, fonts, spacing, class names.
-- Keep the same 6 sections in the same order with the same headings and numbering.
+- Keep the same 5 sections in the same order with the same headings and numbering.
 - Reuse the template's component patterns: .summary-box rows, the holdings <table>, .stock-detail cards
   grouped under "Sell Recommendations" / "Hold Recommendations", .section-intro callouts,
   .alert / .alert.opportunity / .alert.sell cards, and .summary-row lists.
