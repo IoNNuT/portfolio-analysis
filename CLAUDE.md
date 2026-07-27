@@ -49,6 +49,15 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
    **per ticker**, so a partial Alpha Vantage failure still yields a complete table and the
    source label in the report names whichever provider(s) served it.
 
+   **Calls are paced at `AV_CALL_SPACING_S` (15s) — do not remove this.** The free tier
+   allows ~5 requests/minute; firing all 8 back-to-back lost 6 of 7 tickers to
+   "Please consider spreading out your free API requests" (2026-07-27). The whole fetch
+   takes ~2 minutes, which is irrelevant for a weekly job. `_av_get` also distinguishes a
+   *minute* throttle (backs off 60s and retries) from a *daily* quota exhaustion (fails
+   straight through — it can't clear during the run), and a circuit breaker abandons Alpha
+   Vantage after 2 consecutive ticker failures so a persistent throttle can't idle the job
+   for ~16 minutes before reaching Yahoo.
+
    Yahoo moved to fallback because it proved unreliable from CI: the 2026-07-27 scheduled run
    got `401` on every ticker, and the manual re-run got `429` on the crumb endpoint (Actions
    runs on Azure ranges Yahoo throttles hard). **When Alpha Vantage is healthy, Yahoo is never

@@ -2,6 +2,7 @@ import os
 import re
 import csv
 import io
+import time
 import json
 import sqlite3
 import hashlib
@@ -1012,6 +1013,60 @@ def _fmt_pct(v, signed=True):
 # shared across all tickers — 8 calls a week against a 25/day free quota.
 AV_URL = "https://www.alphavantage.co/query"
 
+# The free tier allows ~5 requests/minute. The 2026-07-27 run fired all 8 calls
+# back-to-back and lost 6 of 7 tickers to "Please consider spreading out your free
+# API requests" — one slipped through mid-run as the rolling window rolled over.
+# 15s spacing keeps us at ~4/min; a weekly job can afford the ~2 minutes.
+AV_CALL_SPACING_S   = 15
+AV_THROTTLE_BACKOFF = 60
+AV_MAX_RETRIES      = 2
+_AV_LAST_CALL       = [0.0]   # monotonic timestamp of the last request
+
+def _av_throttle_kind(text):
+    """None if not throttled, else 'minute' (retryable) or 'day' (not worth retrying).
+
+    Alpha Vantage reports throttling with HTTP 200 and an Information/Note key, so
+    the wording is the only signal. A daily-quota exhaustion won't clear inside this
+    run, so it fails straight through to the Yahoo fallback instead of sleeping.
+    """
+    if not text.lstrip().startswith("{"):
+        return None
+    try:
+        d = json.loads(text)
+    except ValueError:
+        return None
+    msg = str(d.get("Information") or d.get("Note") or "").lower()
+    if not msg:
+        return None
+    if "per day" in msg or "daily" in msg:
+        return "day"
+    if "spreading out" in msg or "per minute" in msg or "rate limit" in msg:
+        return "minute"
+    return None
+
+def _av_get(params, api_key):
+    """One paced Alpha Vantage request, retrying its per-minute throttle."""
+    last = ""
+    for attempt in range(AV_MAX_RETRIES + 1):
+        gap = AV_CALL_SPACING_S - (time.monotonic() - _AV_LAST_CALL[0])
+        if gap > 0:
+            time.sleep(gap)
+        r = requests.get(AV_URL, timeout=20, params={**params, "apikey": api_key})
+        _AV_LAST_CALL[0] = time.monotonic()
+        if r.status_code != 200:
+            raise RuntimeError(f"HTTP {r.status_code}")
+
+        kind = _av_throttle_kind(r.text)
+        if kind is None:
+            return r
+        last = kind
+        if kind == "day":
+            raise RuntimeError("daily quota exhausted")
+        if attempt < AV_MAX_RETRIES:
+            print(f"[{TODAY_STR}]   Alpha Vantage throttled — backing off {AV_THROTTLE_BACKOFF}s")
+            time.sleep(AV_THROTTLE_BACKOFF)
+    raise RuntimeError(f"throttled ({last}) after {AV_MAX_RETRIES} retries")
+
 def _av_num(v):
     """Alpha Vantage returns everything as strings, with 'None'/'-'/'' for missing."""
     if v is None:
@@ -1046,10 +1101,7 @@ def _av_consensus(d):
 
 def _av_earnings_calendar(api_key):
     """{TICKER: next report date} from one bulk CSV call. {} if unavailable."""
-    r = requests.get(AV_URL, timeout=20, params={
-        "function": "EARNINGS_CALENDAR", "horizon": "3month", "apikey": api_key})
-    if r.status_code != 200:
-        raise RuntimeError(f"HTTP {r.status_code}")
+    r = _av_get({"function": "EARNINGS_CALENDAR", "horizon": "3month"}, api_key)
     text = r.text or ""
     if text.lstrip().startswith("{"):          # soft error arrives as JSON, not CSV
         _av_check(json.loads(text))
@@ -1064,10 +1116,7 @@ def _av_earnings_calendar(api_key):
 
 def _fetch_av_fundamental(sym, api_key, earnings_by_sym):
     """Valuation snapshot for one ticker from Alpha Vantage. Raises if unavailable."""
-    r = requests.get(AV_URL, timeout=20, params={
-        "function": "OVERVIEW", "symbol": sym, "apikey": api_key})
-    if r.status_code != 200:
-        raise RuntimeError(f"HTTP {r.status_code}")
+    r = _av_get({"function": "OVERVIEW", "symbol": sym}, api_key)
     d = r.json()
     _av_check(d)
     return {
@@ -1160,14 +1209,28 @@ def fetch_fundamentals(symbols):
         return yahoo
 
     rows, failed, used = [], [], []
+    av_consecutive_fail = 0
     for sym in symbols:
         f, source, errs = None, None, []
 
         if av_key:
             try:
                 f, source = _fetch_av_fundamental(sym, av_key, av_cal), "AV"
+                av_consecutive_fail = 0
             except Exception as e:
                 errs.append(f"AV: {e}")
+                av_consecutive_fail += 1
+                # Circuit breaker. A daily-quota exhaustion can't clear during this
+                # run, and two tickers in a row burning their full retry budget means
+                # Alpha Vantage isn't going to serve us either. Without this, seven
+                # tickers each retrying twice with a 60s backoff would idle ~16
+                # minutes before falling through to Yahoo.
+                if "daily quota" in str(e) or av_consecutive_fail >= 2:
+                    why = ("daily quota gone" if "daily quota" in str(e)
+                           else f"{av_consecutive_fail} consecutive failures")
+                    print(f"[{TODAY_STR}] Giving up on Alpha Vantage ({why}) — "
+                          f"remaining tickers use Yahoo")
+                    av_key = ""
 
         if f is None:
             auth = yahoo_auth()
