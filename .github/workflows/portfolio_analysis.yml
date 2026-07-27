@@ -40,6 +40,9 @@ jobs:
           DASHBOARD_URL:       ${{ secrets.DASHBOARD_URL }}
           ICLOUD_EMAIL:        ${{ secrets.ICLOUD_EMAIL }}
           ICLOUD_APP_PASSWORD: ${{ secrets.ICLOUD_APP_PASSWORD }}
+          # Primary source for stock fundamentals; Yahoo is the fallback if unset
+          # or over quota. Free key: https://www.alphavantage.co/support/#api-key
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
         run: python portfolio_analysis.py
 
       # Save the updated cache so next run knows which articles were already seen

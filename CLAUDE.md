@@ -43,14 +43,27 @@ When suggesting changes that affect API usage (prompt size, number of calls, mod
    request per ticker). Cited in the Section 2 rationales. Degrades to a marker line on failure,
    per-ticker, so a Yahoo change can't break the run. See `fetch_fundamentals`.
 
-   **`quoteSummary` requires auth** — unlike the open `v8/finance/chart` endpoint the S&P
-   comparison uses. It needs a session cookie + matching `crumb` query param, and it rejects
-   bot User-Agents (so `FEED_HEADERS` does not work here; `YAHOO_UA` is a browser string).
-   `_yahoo_authed_session` does the handshake once per run: cookie from `fc.yahoo.com` (which
-   answers 404 but sets it — check the jar, not the status), then `/v1/test/getcrumb`. The
-   crumb is charset-validated because Yahoo serves rate-limit prose and HTML error pages with
-   HTTP 200 from that endpoint. Errors name the failing step, so a log line tells you whether
-   the cookie, the crumb, or a per-ticker call broke.
+   **Alpha Vantage is primary; Yahoo is the fallback.** One `OVERVIEW` call per ticker plus
+   one bulk `EARNINGS_CALENDAR` call — 8 requests/week against a 25/day free quota. Needs
+   `ALPHAVANTAGE_API_KEY`; without it the fetch silently uses Yahoo only. Fallback is
+   **per ticker**, so a partial Alpha Vantage failure still yields a complete table and the
+   source label in the report names whichever provider(s) served it.
+
+   Yahoo moved to fallback because it proved unreliable from CI: the 2026-07-27 scheduled run
+   got `401` on every ticker, and the manual re-run got `429` on the crumb endpoint (Actions
+   runs on Azure ranges Yahoo throttles hard). **When Alpha Vantage is healthy, Yahoo is never
+   called at all** — that is the point of the ordering, since the crumb endpoint is what
+   throttles.
+
+   Yahoo's `quoteSummary` needs auth, unlike the open `v8/finance/chart` endpoint the S&P
+   comparison uses: a session cookie + matching `crumb` query param, and it rejects bot
+   User-Agents (so `FEED_HEADERS` does not work here; `YAHOO_UA` is a browser string).
+   `_yahoo_authed_session` does the handshake lazily and at most once per run: cookie from
+   `fc.yahoo.com` (which answers 404 but sets it — check the jar, not the status), then
+   `/v1/test/getcrumb`. The crumb is charset-validated because Yahoo serves rate-limit prose
+   and HTML error pages with HTTP 200 from that endpoint. Alpha Vantage likewise signals
+   quota and bad-symbol errors with HTTP 200 and an `Information` / `Note` / `Error Message`
+   key, which `_av_check` treats as failures. Errors name the source and the failing step.
 5. **Newsletters:** Pull subscribed newsletters from iCloud Mail (IMAP, by sender), dedup against
    the article cache, then Haiku-distill each into ~5 portfolio-relevant bullets. Folded into
    Section 3 (New US Positions), the per-stock Section 2 rationale, the Watchlist, and Section 5
@@ -109,6 +122,7 @@ GMAIL_USER, GMAIL_APP_PASSWORD  # Gmail SMTP
 RECIPIENT_EMAIL             # Report recipient
 DASHBOARD_URL               # Link to interactive dashboard
 ICLOUD_EMAIL, ICLOUD_APP_PASSWORD  # iCloud IMAP for newsletters (optional; app-specific password). Needs imap-tools.
+ALPHAVANTAGE_API_KEY        # Stock fundamentals (optional; falls back to Yahoo). Free key at alphavantage.co
 ```
 
 ## Google Sheets

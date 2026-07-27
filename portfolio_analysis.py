@@ -32,6 +32,12 @@ DASHBOARD_URL      = os.environ.get("DASHBOARD_URL", "")
 ICLOUD_EMAIL        = os.environ.get("ICLOUD_EMAIL", "")
 ICLOUD_APP_PASSWORD = os.environ.get("ICLOUD_APP_PASSWORD", "")
 
+# Primary source for stock fundamentals. Optional in the same sense: without it the
+# fetch falls back to Yahoo, which is what the 2026-07-27 runs showed to be unreliable
+# from CI (401, then 429 on the crumb endpoint — Actions runs on Azure ranges Yahoo
+# throttles hard). Free key: https://www.alphavantage.co/support/#api-key
+ALPHAVANTAGE_API_KEY = os.environ.get("ALPHAVANTAGE_API_KEY", "")
+
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%Y-%m-%d")
 DB_PATH   = os.path.join(os.path.dirname(__file__), "seen_articles.db")
@@ -999,6 +1005,85 @@ def _fmt_pct(v, signed=True):
         return "n/a"
     return f"{v * 100:+.1f}%" if signed else f"{v * 100:.2f}%"
 
+# ── Alpha Vantage (primary source) ───────────────────────────────────────────
+# One OVERVIEW call per ticker covers every field Yahoo gave us, plus analyst
+# rating buckets (richer than Yahoo's single recommendationKey string). Earnings
+# dates aren't in OVERVIEW, so they come from one bulk EARNINGS_CALENDAR call
+# shared across all tickers — 8 calls a week against a 25/day free quota.
+AV_URL = "https://www.alphavantage.co/query"
+
+def _av_num(v):
+    """Alpha Vantage returns everything as strings, with 'None'/'-'/'' for missing."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    if s in ("", "None", "-", "N/A", "NaN"):
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+def _av_check(payload):
+    """Raise on Alpha Vantage's several soft-error shapes, which all return HTTP 200."""
+    for key in ("Information", "Note", "Error Message"):
+        if key in payload:
+            raise RuntimeError(f"{key}: {str(payload[key])[:80]}")
+    if not payload or "Symbol" not in payload:
+        raise RuntimeError("empty response")
+
+def _av_consensus(d):
+    """Collapse the five analyst-rating buckets into a label plus the analyst count."""
+    weights = {"StrongBuy": 1, "Buy": 2, "Hold": 3, "Sell": 4, "StrongSell": 5}
+    counts = {k: _av_num(d.get(f"AnalystRating{k}")) or 0 for k in weights}
+    total = sum(counts.values())
+    if not total:
+        return "n/a"
+    score = sum(weights[k] * c for k, c in counts.items()) / total
+    label = ("strong buy" if score < 1.5 else "buy" if score < 2.5 else
+             "hold" if score < 3.5 else "sell" if score < 4.5 else "strong sell")
+    return f"{label}, n={int(total)}"
+
+def _av_earnings_calendar(api_key):
+    """{TICKER: next report date} from one bulk CSV call. {} if unavailable."""
+    r = requests.get(AV_URL, timeout=20, params={
+        "function": "EARNINGS_CALENDAR", "horizon": "3month", "apikey": api_key})
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code}")
+    text = r.text or ""
+    if text.lstrip().startswith("{"):          # soft error arrives as JSON, not CSV
+        _av_check(json.loads(text))
+    out = {}
+    for row in csv.DictReader(io.StringIO(text)):
+        sym, date = (row.get("symbol") or "").strip().upper(), (row.get("reportDate") or "").strip()
+        if sym and date and (sym not in out or date < out[sym]):
+            out[sym] = date                     # keep the soonest upcoming report
+    if not out:
+        raise RuntimeError("no rows parsed")
+    return out
+
+def _fetch_av_fundamental(sym, api_key, earnings_by_sym):
+    """Valuation snapshot for one ticker from Alpha Vantage. Raises if unavailable."""
+    r = requests.get(AV_URL, timeout=20, params={
+        "function": "OVERVIEW", "symbol": sym, "apikey": api_key})
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code}")
+    d = r.json()
+    _av_check(d)
+    return {
+        "fwd_pe":      _fmt_ratio(_av_num(d.get("ForwardPE"))),
+        "trail_pe":    _fmt_ratio(_av_num(d.get("TrailingPE"))),
+        "peg":         _fmt_ratio(_av_num(d.get("PEGRatio"))),
+        "rev_growth":  _fmt_pct(_av_num(d.get("QuarterlyRevenueGrowthYOY"))),
+        "earn_growth": _fmt_pct(_av_num(d.get("QuarterlyEarningsGrowthYOY"))),
+        "margin":      _fmt_pct(_av_num(d.get("ProfitMargin"))),
+        "target":      _fmt_ratio(_av_num(d.get("AnalystTargetPrice"))),
+        "reco":        _av_consensus(d),
+        "div_yield":   _fmt_pct(_av_num(d.get("DividendYield")), signed=False),
+        "earnings":    earnings_by_sym.get(sym.upper(), "n/a"),
+    }
+
+# ── Yahoo (fallback source) ──────────────────────────────────────────────────
 def _fetch_one_fundamental(sym, session, crumb):
     """Valuation snapshot for one ticker, or None if unavailable."""
     url = (f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
@@ -1041,28 +1126,64 @@ def _fetch_one_fundamental(sym, session, crumb):
     }
 
 def fetch_fundamentals(symbols):
-    """Per-ticker valuation table for the Sonnet prompt. Never raises."""
+    """Per-ticker valuation table for the Sonnet prompt. Never raises.
+
+    Alpha Vantage first, Yahoo as per-ticker fallback. Yahoo was the original
+    source but proved unreliable from CI (2026-07-27: 401, then 429 on the crumb
+    endpoint), so it is now the backstop rather than the primary. Either source
+    alone produces a complete table; losing both degrades to a marker line.
+    """
     if not symbols:
         return "[No US stock positions]"
 
-    # Authenticate once, not per ticker. A failure here is a single upstream
-    # problem, so report it once rather than as N identical per-ticker errors —
-    # the 2026-07-27 run printed the same "HTTP 401" seven times, which told us
-    # nothing about which step was broken.
-    try:
-        session, crumb = _yahoo_authed_session()
-    except Exception as e:
-        print(f"[{TODAY_STR}] Warning: Yahoo fundamentals auth failed — {e}")
-        return ("[Fundamentals unavailable this run — Yahoo authentication failed "
-                f"({e}). Judge on price action, P&L and tax brackets only.]")
-
-    rows, failed = [], []
-    for sym in symbols:
+    av_key, av_cal = ALPHAVANTAGE_API_KEY, {}
+    if av_key:
         try:
-            f = _fetch_one_fundamental(sym, session, crumb)
+            av_cal = _av_earnings_calendar(av_key)
         except Exception as e:
-            failed.append(f"{sym} ({e})")
+            # Non-fatal: only costs the earnings-date column.
+            print(f"[{TODAY_STR}] Warning: Alpha Vantage earnings calendar failed — {e}")
+    else:
+        print(f"[{TODAY_STR}] No ALPHAVANTAGE_API_KEY set — using Yahoo only")
+
+    # Yahoo auth is lazy and done at most once: if Alpha Vantage serves every
+    # ticker we never touch Yahoo, which keeps us off the endpoint that throttles.
+    yahoo, yahoo_err = None, None
+    def yahoo_auth():
+        nonlocal yahoo, yahoo_err
+        if yahoo is None and yahoo_err is None:
+            try:
+                yahoo = _yahoo_authed_session()
+            except Exception as e:
+                yahoo_err = str(e)
+                print(f"[{TODAY_STR}] Warning: Yahoo fallback auth failed — {e}")
+        return yahoo
+
+    rows, failed, used = [], [], []
+    for sym in symbols:
+        f, source, errs = None, None, []
+
+        if av_key:
+            try:
+                f, source = _fetch_av_fundamental(sym, av_key, av_cal), "AV"
+            except Exception as e:
+                errs.append(f"AV: {e}")
+
+        if f is None:
+            auth = yahoo_auth()
+            if auth:
+                try:
+                    f, source = _fetch_one_fundamental(sym, *auth), "Yahoo"
+                except Exception as e:
+                    errs.append(f"Yahoo: {e}")
+            else:
+                errs.append(f"Yahoo: {yahoo_err}")
+
+        if f is None:
+            failed.append(f"{sym} ({'; '.join(errs)})")
             continue
+
+        used.append(source)
         rows.append(
             f"{sym} | fwd P/E {f['fwd_pe']} | trail P/E {f['trail_pe']} | PEG {f['peg']} | "
             f"rev growth {f['rev_growth']} | EPS growth {f['earn_growth']} | "
@@ -1073,9 +1194,14 @@ def fetch_fundamentals(symbols):
     if failed:
         print(f"[{TODAY_STR}] Warning: fundamentals unavailable for {', '.join(failed)}")
     if not rows:
-        return "[Fundamentals unavailable this run — judge on price action, P&L and tax brackets only]"
+        return ("[Fundamentals unavailable this run — every source failed. "
+                "Judge on price action, P&L and tax brackets only.]")
 
-    out = ["Per-stock fundamentals (Yahoo Finance, live):"] + rows
+    # Name the source(s) so a silent degradation to one provider is visible in the
+    # report itself, not just the run log.
+    src = {"AV": "Alpha Vantage", "Yahoo": "Yahoo Finance"}
+    label = " + ".join(src[s] for s in dict.fromkeys(used))
+    out = [f"Per-stock fundamentals ({label}, live):"] + rows
     if failed:
         out.append(f"(unavailable: {', '.join(s.split(' (')[0] for s in failed)})")
     return "\n".join(out)
