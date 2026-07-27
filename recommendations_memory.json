@@ -6,8 +6,8 @@
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "AI thesis intact, loss widened this week",
-      "catalyst": "",
+      "thesis": "AI creative thesis intact, loss widened on selloff",
+      "catalyst": "Earnings 2026-09-10",
       "stance_since": "2026-06-01",
       "price": 225.11,
       "pnl_pct": -9.29
@@ -17,7 +17,7 @@
       "stance": "HOLD",
       "conviction": "high",
       "thesis": "Cloud+AI leader, capex tailwind intact",
-      "catalyst": "Q2 earnings this week",
+      "catalyst": "Earnings 2026-07-30",
       "stance_since": "2026-06-01",
       "price": 232.11,
       "pnl_pct": -2.29
@@ -35,9 +35,9 @@
     {
       "ticker": "CRM",
       "stance": "SELL",
-      "conviction": "high",
-      "thesis": "AI displacement risk persists despite VA deal",
-      "catalyst": "",
+      "conviction": "medium",
+      "thesis": "Talent drain risk, but VA deal offsets some",
+      "catalyst": "Earnings 2026-09-02",
       "stance_since": "2026-06-22",
       "price": 163.66,
       "pnl_pct": -4.51
@@ -46,7 +46,7 @@
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Oral GLP-1 pipeline intact, buyback supportive",
+      "thesis": "Oral GLP-1 pipeline intact, valuation stretched",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
       "price": 48.77,
@@ -56,8 +56,8 @@
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Robotaxi competition intensifying, Waymo exit risk",
-      "catalyst": "Waymo-Uber partnership review",
+      "thesis": "Robotaxi competition intensifying, Waymo risk",
+      "catalyst": "Earnings 2026-08-05",
       "stance_since": "2026-06-08",
       "price": 65.94,
       "pnl_pct": -14.07
@@ -67,7 +67,7 @@
       "stance": "HOLD",
       "conviction": "medium",
       "thesis": "AI/data-center power demand thesis intact",
-      "catalyst": "Earnings 2026-08-07; PJM decision Mar-2027",
+      "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
       "price": 163.38,
       "pnl_pct": 8.42
