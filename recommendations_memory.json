@@ -1,36 +1,36 @@
 {
-  "week_date": "2026-07-20",
+  "week_date": "2026-07-27",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
-      "stance": "HOLD",
+      "stance": "SELL",
       "conviction": "high",
-      "thesis": "AI creative thesis intact, loss narrowing",
+      "thesis": "Loss widening multi-week, thesis broken",
       "catalyst": "",
-      "stance_since": "2026-06-01",
-      "price": 237.25,
-      "pnl_pct": -4.4
+      "stance_since": "2026-07-27",
+      "price": 225.11,
+      "pnl_pct": -9.29
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud+AI leader, capex tailwind",
-      "catalyst": "",
+      "thesis": "Cloud+AI leader, capex tailwind intact",
+      "catalyst": "Capex guidance raise Jul 30 earnings",
       "stance_since": "2026-06-01",
-      "price": 247.23,
-      "pnl_pct": 3.92
+      "price": 232.11,
+      "pnl_pct": -2.29
     },
     {
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Defensive, in profit, awaiting 3% bracket",
+      "thesis": "Defensive profit, awaiting 3% tax bracket",
       "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 60.74,
-      "pnl_pct": 32.16
+      "price": 62.09,
+      "pnl_pct": 35.1
     },
     {
       "ticker": "CRM",
@@ -39,8 +39,8 @@
       "thesis": "Talent drain, AI displacement risk persists",
       "catalyst": "",
       "stance_since": "2026-06-22",
-      "price": 170.77,
-      "pnl_pct": -0.36
+      "price": 163.66,
+      "pnl_pct": -4.51
     },
     {
       "ticker": "NVO",
@@ -49,28 +49,28 @@
       "thesis": "Oral GLP-1 pipeline intact",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
-      "price": 50.32,
-      "pnl_pct": 23.8
+      "price": 48.77,
+      "pnl_pct": 19.99
     },
     {
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
       "thesis": "Robotaxi competition intensifying, no catalyst",
-      "catalyst": "Delivery Hero deal watch",
+      "catalyst": "",
       "stance_since": "2026-06-08",
-      "price": 72.46,
-      "pnl_pct": -5.58
+      "price": 65.94,
+      "pnl_pct": -14.07
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
-      "conviction": "medium",
+      "conviction": "high",
       "thesis": "AI/data-center power demand thesis intact",
       "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 155.44,
-      "pnl_pct": 3.15
+      "price": 163.38,
+      "pnl_pct": 8.42
     }
   ]
 }
