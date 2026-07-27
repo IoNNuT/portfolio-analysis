@@ -926,7 +926,57 @@ def load_income_summary():
 # plain text. Degrades the same way the newsletter block does — a failed fetch
 # yields a marker line and the report still sends, so an upstream Yahoo change
 # can't break the weekly run.
+#
+# AUTH: quoteSummary is not open like the v8 chart endpoint the S&P comparison
+# uses. It needs a session cookie plus a matching "crumb" query parameter, and it
+# rejects non-browser User-Agents. The 2026-07-27 run returned 401 on all seven
+# tickers because the first implementation sent neither (and used the bot UA from
+# FEED_HEADERS). The handshake is: hit a Yahoo host to get an A1/A3 cookie, trade
+# that cookie for a crumb at /v1/test/getcrumb, then send both on every request.
+# Done once per run and reused across tickers.
 FUNDAMENTAL_MODULES = "defaultKeyStatistics,financialData,calendarEvents,summaryDetail"
+
+# Yahoo's JSON APIs 401/403 a bot-ish UA that its RSS feeds accept happily.
+YAHOO_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+# fc.yahoo.com answers 404 but still sets the consent cookie — that's expected, so
+# the cookie jar is what we check, not the status code. finance.yahoo.com is the
+# fallback if that host ever stops serving it.
+YAHOO_COOKIE_URLS = ["https://fc.yahoo.com", "https://finance.yahoo.com/quote/AAPL"]
+YAHOO_CRUMB_URL   = "https://query1.finance.yahoo.com/v1/test/getcrumb"
+
+def _yahoo_authed_session():
+    """(session, crumb) for the quoteSummary API. Raises with the failing step named."""
+    session = requests.Session()
+    session.headers.update({"User-Agent": YAHOO_UA, "Accept": "application/json,text/plain,*/*"})
+
+    got_cookie, cookie_errs = False, []
+    for url in YAHOO_COOKIE_URLS:
+        try:
+            session.get(url, timeout=15)
+        except Exception as e:
+            cookie_errs.append(f"{url}: {e}")
+            continue
+        if len(session.cookies) > 0:
+            got_cookie = True
+            break
+        cookie_errs.append(f"{url}: no cookie set")
+    if not got_cookie:
+        raise RuntimeError(f"cookie step failed ({'; '.join(cookie_errs)})")
+
+    r = session.get(YAHOO_CRUMB_URL, timeout=15)
+    if r.status_code != 200:
+        raise RuntimeError(f"crumb step failed (HTTP {r.status_code})")
+    crumb = (r.text or "").strip()
+    # A real crumb is a short opaque token like "hJ8kQ2.pXvA". Yahoo serves
+    # rate-limit prose and HTML error pages with HTTP 200 from this endpoint, so
+    # validate the shape rather than trusting the status. Charset (not just
+    # "no whitespace") is what rejects markup — "<html><body>Error</body></html>"
+    # is 30 characters with no spaces and would otherwise pass.
+    if not re.fullmatch(r"[A-Za-z0-9._\\/=+-]{4,32}", crumb):
+        raise RuntimeError(f"crumb step returned non-crumb text: {crumb[:60]!r}")
+    return session, crumb
 
 def _fmt_ratio(v, suffix=""):
     """Yahoo returns either a raw number or {'raw': n, 'fmt': '...'}; may be absent."""
@@ -949,11 +999,12 @@ def _fmt_pct(v, signed=True):
         return "n/a"
     return f"{v * 100:+.1f}%" if signed else f"{v * 100:.2f}%"
 
-def _fetch_one_fundamental(sym):
+def _fetch_one_fundamental(sym, session, crumb):
     """Valuation snapshot for one ticker, or None if unavailable."""
     url = (f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
-           f"{requests.utils.quote(sym)}?modules={FUNDAMENTAL_MODULES}")
-    r = requests.get(url, headers=FEED_HEADERS, timeout=15)
+           f"{requests.utils.quote(sym)}?modules={FUNDAMENTAL_MODULES}"
+           f"&crumb={requests.utils.quote(crumb)}")
+    r = session.get(url, timeout=15)
     if r.status_code != 200:
         raise RuntimeError(f"HTTP {r.status_code}")
     result = (r.json().get("quoteSummary") or {}).get("result") or []
@@ -994,10 +1045,21 @@ def fetch_fundamentals(symbols):
     if not symbols:
         return "[No US stock positions]"
 
+    # Authenticate once, not per ticker. A failure here is a single upstream
+    # problem, so report it once rather than as N identical per-ticker errors —
+    # the 2026-07-27 run printed the same "HTTP 401" seven times, which told us
+    # nothing about which step was broken.
+    try:
+        session, crumb = _yahoo_authed_session()
+    except Exception as e:
+        print(f"[{TODAY_STR}] Warning: Yahoo fundamentals auth failed — {e}")
+        return ("[Fundamentals unavailable this run — Yahoo authentication failed "
+                f"({e}). Judge on price action, P&L and tax brackets only.]")
+
     rows, failed = [], []
     for sym in symbols:
         try:
-            f = _fetch_one_fundamental(sym)
+            f = _fetch_one_fundamental(sym, session, crumb)
         except Exception as e:
             failed.append(f"{sym} ({e})")
             continue
