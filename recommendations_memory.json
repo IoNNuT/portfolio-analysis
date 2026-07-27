@@ -4,11 +4,11 @@
   "recommendations": [
     {
       "ticker": "ADBE",
-      "stance": "SELL",
+      "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Loss widening multi-week, thesis broken",
+      "thesis": "AI creative thesis intact, loss widening",
       "catalyst": "",
-      "stance_since": "2026-07-27",
+      "stance_since": "2026-06-01",
       "price": 225.11,
       "pnl_pct": -9.29
     },
@@ -16,8 +16,8 @@
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud+AI leader, capex tailwind intact",
-      "catalyst": "Capex guidance raise Jul 30 earnings",
+      "thesis": "Cloud+AI leader, capex tailwind persists",
+      "catalyst": "Earnings this week, AI capex signal",
       "stance_since": "2026-06-01",
       "price": 232.11,
       "pnl_pct": -2.29
@@ -26,8 +26,8 @@
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Defensive profit, awaiting 3% tax bracket",
-      "catalyst": "3% bracket 2026-10-03",
+      "thesis": "Defensive, in profit, awaiting 3% bracket",
+      "catalyst": "3% bracket in 69 days",
       "stance_since": "2026-06-01",
       "price": 62.09,
       "pnl_pct": 35.1
@@ -46,7 +46,7 @@
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Oral GLP-1 pipeline intact",
+      "thesis": "Oral GLP-1 pipeline intact, buyback positive",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
       "price": 48.77,
@@ -56,8 +56,8 @@
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Robotaxi competition intensifying, no catalyst",
-      "catalyst": "",
+      "thesis": "Robotaxi competition intensifying, Waymo exit rumor",
+      "catalyst": "Waymo-Uber partnership review",
       "stance_since": "2026-06-08",
       "price": 65.94,
       "pnl_pct": -14.07
@@ -65,7 +65,7 @@
     {
       "ticker": "VST",
       "stance": "HOLD",
-      "conviction": "high",
+      "conviction": "medium",
       "thesis": "AI/data-center power demand thesis intact",
       "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
