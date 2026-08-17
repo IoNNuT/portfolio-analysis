@@ -1,76 +1,76 @@
 {
-  "week_date": "2026-08-03",
+  "week_date": "2026-08-17",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
-      "stance": "SELL",
+      "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Valuation cheap but no reversal confirmed yet",
-      "catalyst": "Next earnings 2026-09-10",
-      "stance_since": "2026-07-27",
-      "price": 250.41,
-      "pnl_pct": 0.9
+      "thesis": "Swung to profit; PEG 0.64 signals undervaluation",
+      "catalyst": "Earnings 2026-09-10",
+      "stance_since": "2026-08-17",
+      "price": 264.02,
+      "pnl_pct": 6.39
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud/AI capex tailwind intact, earnings imminent",
-      "catalyst": "Earnings 2026-08-04, capex guidance",
+      "thesis": "Cloud+AI leader, capex tailwind intact",
+      "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 271.58,
-      "pnl_pct": 14.32
+      "price": 262.65,
+      "pnl_pct": 10.56
     },
     {
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Merger speculation, awaiting 3% tax bracket",
-      "catalyst": "3% tax bracket 2026-10-03",
+      "thesis": "Defensive profit, awaiting 3% tax bracket",
+      "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 65.31,
-      "pnl_pct": 42.1
+      "price": 63.83,
+      "pnl_pct": 38.88
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Analyst upside, sentiment rotation into Salesforce",
-      "catalyst": "Earnings 2026-09-02",
-      "stance_since": "2026-08-03",
-      "price": 184.02,
-      "pnl_pct": 7.37
+      "thesis": "Swung to profit; cheap valuation, earnings risk soon",
+      "catalyst": "Earnings 2026-08-26",
+      "stance_since": "2026-08-17",
+      "price": 196.21,
+      "pnl_pct": 14.48
     },
     {
       "ticker": "NVO",
       "stance": "HOLD",
-      "conviction": "low",
-      "thesis": "Trial setback caps upside, awaiting earnings clarity",
-      "catalyst": "Earnings 2026-08-05",
+      "conviction": "medium",
+      "thesis": "Oral GLP-1 pipeline intact, growth weakening",
+      "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
-      "price": 47.08,
-      "pnl_pct": 15.83
+      "price": 45.89,
+      "pnl_pct": 12.9
     },
     {
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "EPS collapse, lawsuit risk, no recovery catalyst",
-      "catalyst": "Earnings 2026-08-05",
+      "thesis": "Robotaxi competition intensifying, Serve stake sold",
+      "catalyst": "",
       "stance_since": "2026-06-08",
-      "price": 70.36,
-      "pnl_pct": -8.31
+      "price": 75.95,
+      "pnl_pct": -1.03
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "AI power demand thesis intact, earnings soon",
-      "catalyst": "Earnings 2026-08-07; PJM Mar-2027",
+      "thesis": "AI/data-center power demand thesis intact",
+      "catalyst": "PJM capacity decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 148.19,
-      "pnl_pct": -1.66
+      "price": 148.13,
+      "pnl_pct": -1.7
     }
   ]
 }
