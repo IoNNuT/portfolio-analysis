@@ -1,16 +1,16 @@
 {
-  "week_date": "2026-08-17",
+  "week_date": "2026-08-24",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Swung to profit; PEG 0.64 signals undervaluation",
+      "thesis": "PEG 0.67, cheap vs growth, above target",
       "catalyst": "Earnings 2026-09-10",
       "stance_since": "2026-08-17",
-      "price": 264.02,
-      "pnl_pct": 6.39
+      "price": 275.3,
+      "pnl_pct": 10.93
     },
     {
       "ticker": "AMZN",
@@ -19,8 +19,8 @@
       "thesis": "Cloud+AI leader, capex tailwind intact",
       "catalyst": "",
       "stance_since": "2026-06-01",
-      "price": 262.65,
-      "pnl_pct": 10.56
+      "price": 258.63,
+      "pnl_pct": 8.87
     },
     {
       "ticker": "BMY",
@@ -29,48 +29,48 @@
       "thesis": "Defensive profit, awaiting 3% tax bracket",
       "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 63.83,
-      "pnl_pct": 38.88
+      "price": 67.01,
+      "pnl_pct": 45.8
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Swung to profit; cheap valuation, earnings risk soon",
+      "thesis": "Cheap vs growth, Agentforce momentum",
       "catalyst": "Earnings 2026-08-26",
       "stance_since": "2026-08-17",
-      "price": 196.21,
-      "pnl_pct": 14.48
+      "price": 209.17,
+      "pnl_pct": 22.04
     },
     {
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "Oral GLP-1 pipeline intact, growth weakening",
+      "thesis": "Pipeline optionality, growth weakening",
       "catalyst": "ADA 2026 data",
       "stance_since": "2026-06-01",
-      "price": 45.89,
-      "pnl_pct": 12.9
+      "price": 42.3,
+      "pnl_pct": 4.1
     },
     {
       "ticker": "UBER",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Robotaxi competition intensifying, Serve stake sold",
-      "catalyst": "",
+      "thesis": "PEG 8.74 rich, fine risk vs Tepper buy",
+      "catalyst": "DOT fine outcome",
       "stance_since": "2026-06-08",
-      "price": 75.95,
-      "pnl_pct": -1.03
+      "price": 80.6,
+      "pnl_pct": 5.0
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "AI/data-center power demand thesis intact",
-      "catalyst": "PJM capacity decision Mar-2027",
+      "thesis": "AI power demand thesis, PEG 0.39",
+      "catalyst": "PJM decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 148.13,
-      "pnl_pct": -1.7
+      "price": 136.21,
+      "pnl_pct": -9.61
     }
   ]
 }
