@@ -167,11 +167,30 @@ function recordPortfolioSnapshot_v1() {
   const pnl    = totalTtlReturn != null ? totalTtlReturn : totalMV - totalInvested;
   const pnlPct = pnl / totalInvested;
 
-  // Skip if all values match the last recorded row
+  // One row per day, keyed on the date — NOT on the values.
+  //
+  // The old guard skipped the append whenever all four values equalled the previous
+  // row. US stock values jitter by cents even when the market is shut, so Stocks
+  // History never hit it; the .DE ETF quotes are byte-identical whenever XETRA is
+  // closed, so ETF History lost every Saturday (and any day the quotes hadn't moved)
+  // between 2026-07-11 and 2026-09-03. A flat day is real information here, and the
+  // dashboard drew a straight line across the holes as if it were one continuous move.
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) {
+    const lastDate = new Date(sheet.getRange(lastRow, 1).getValue());
+    lastDate.setHours(0, 0, 0, 0);
+    if (lastDate.getTime() === today.getTime()) {
+      Logger.log("recordPortfolioSnapshot_v1: skipped — %s is already recorded.", today.toDateString());
+      return;
+    }
+    // Identical values are legitimate on a closed day, but on a trading day they mean
+    // the GOOGLEFINANCE cells never refreshed (flush() recalculates, it does not refetch).
+    // Record the row either way and leave a breadcrumb rather than silently dropping it.
     const last = sheet.getRange(lastRow, 2, 1, 4).getValues()[0];
-    if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) return;
+    if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) {
+      Logger.log("recordPortfolioSnapshot_v1: values identical to %s — recording anyway (market closed, or quotes stale).",
+        lastDate.toDateString());
+    }
   }
 
   const sp500Price = fetchCurrentSP500Price();
@@ -352,6 +371,78 @@ function fetchCurrentSP500Price() {
     Logger.log("fetchCurrentSP500Price error: " + e);
     return null;
   }
+}
+
+// ─────────────────────────────────────────────
+// One-time backfill: restores the nine ETF History rows that the old
+// value-equality guard dropped between 2026-07-11 and 2026-09-03.
+// Run once from the editor, then run backfillSP500() to fill column F.
+//
+// Provenance of each row — no value here is invented:
+//   • The six Saturdays carry the preceding Friday's row forward verbatim. XETRA
+//     was closed, so the portfolio value genuinely did not change; that is exactly
+//     why the old guard suppressed them.
+//   • 2026-08-19 and 2026-09-01 are recomputed from XETRA daily closes × the share
+//     counts held on those dates. The same computation reproduces the seven
+//     surviving rows from 08-18 onward to the cent (worst case €0.18 on 08-31),
+//     which is what makes it trustworthy here.
+//   • 2026-09-03 is the one soft figure: Yahoo has no daily bar for any of the
+//     seven listings that day (though XETRA traded — the DAX and SAP.DE both have
+//     one), so it comes from the last hourly bar instead. That method reproduces
+//     09-02 to within €1.95 of €36,965.81, so treat 09-03 as ±€2, not exact.
+//
+// P&L carries the constant €125.58 of received ETF distributions, matching the
+// "TTL Return (Abs)" offset on every surviving row in this window.
+// ─────────────────────────────────────────────
+const ETF_BACKFILL_ROWS = [
+  // [date, Total MV (€), Invested (€), P&L (€)]
+  ["2026-07-11", 34474.47, 29209.18, 5390.87],  // carry-forward from Fri 07-10
+  ["2026-07-18", 34306.23, 29209.18, 5222.63],  // carry-forward from Fri 07-17
+  ["2026-07-25", 35468.86, 30153.91, 5440.53],  // carry-forward from Fri 07-24
+  ["2026-08-01", 35884.94, 30867.20, 5143.32],  // carry-forward from Fri 07-31
+  ["2026-08-08", 36645.16, 30867.20, 5903.54],  // carry-forward from Fri 08-07
+  ["2026-08-15", 36747.13, 30867.20, 6005.51],  // carry-forward from Fri 08-14
+  ["2026-08-19", 37148.66, 31721.07, 5553.17],  // recomputed from daily closes
+  ["2026-09-01", 36997.92, 31721.07, 5402.43],  // recomputed from daily closes
+  ["2026-09-03", 37197.79, 31721.07, 5602.30],  // recomputed from hourly closes (±€2)
+];
+
+function backfillMissingETFSnapshots() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("ETF History");
+  if (!sheet) throw new Error("backfillMissingETFSnapshots: \"ETF History\" not found");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("backfillMissingETFSnapshots: sheet has no data rows");
+
+  // Index the dates already present so the function is safe to run twice
+  const present = {};
+  sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function (r) {
+    if (!r[0]) return;
+    const d = new Date(r[0]); d.setHours(0, 0, 0, 0);
+    present[d.getTime()] = true;
+  });
+
+  const toAdd = [];
+  ETF_BACKFILL_ROWS.forEach(function (row) {
+    const p = row[0].split("-");
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setHours(0, 0, 0, 0);
+    if (present[d.getTime()]) {
+      Logger.log("backfillMissingETFSnapshots: %s already present — skipping", row[0]);
+      return;
+    }
+    toAdd.push([d, row[1], row[2], row[3], row[3] / row[2]]);
+  });
+
+  if (!toAdd.length) { Logger.log("backfillMissingETFSnapshots: nothing to add"); return; }
+
+  // Append, then re-sort the whole block so the new rows land in date order
+  sheet.getRange(sheet.getLastRow() + 1, 1, toAdd.length, 5).setValues(toAdd);
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn())
+       .sort({ column: 1, ascending: true });
+
+  Logger.log("backfillMissingETFSnapshots: added %s row(s). Now run backfillSP500() to fill column F.",
+    toAdd.length);
 }
 
 // ─────────────────────────────────────────────
