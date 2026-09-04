@@ -5,8 +5,8 @@
 // Setup (one-time):
 //   1. Create a Drive folder (e.g. "Portfolio Analysis Reports").
 //   2. Project Settings → Script Properties → add REPORTS_FOLDER_ID = <folder id>.
-//   3. Triggers → add a time-driven trigger running importReportsFromGmail()
-//      weekly on Monday (after the analysis email is sent).
+//   3. Run ensureDailyReportImportTrigger() once to install the import trigger.
+//      (Do not set this up weekly by hand — see the note on that function.)
 //
 // The read functions (listReports/getReportHtml) run as the deploying user, so
 // reports never leave Apps Script — nothing is published publicly.
@@ -21,7 +21,41 @@ function getReportsFolderId_() {
   return id;
 }
 
-// Trigger this weekly. Idempotent: only reports not already in the folder are added.
+// Installs the daily import trigger, replacing any existing trigger for
+// importReportsFromGmail. Run once from the editor; safe to re-run.
+//
+// This must NOT be weekly. The GitHub Actions job that sends the report is
+// scheduled for 02:00 UTC, but Actions delays scheduled runs under load and the
+// delay is highly variable — across the first fourteen reports the email landed
+// anywhere from 05:55 to 10:52 Europe/Bucharest. A weekly Monday trigger
+// therefore races the email: 2026-08-31 arrived at 10:52, after that Monday's
+// import had already run, and would have sat unimported until 09-07.
+//
+// Daily removes the race. The function is idempotent and writes nothing when
+// there is no new report, so the cost of the extra runs is one Gmail search.
+// Worst case a late report is picked up 24h later instead of 7 days later.
+function ensureDailyReportImportTrigger() {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'importReportsFromGmail') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+
+  // 12:00–13:00 local, comfortably clear of the latest observed arrival (10:52).
+  ScriptApp.newTrigger('importReportsFromGmail')
+    .timeBased()
+    .everyDays(1)
+    .atHour(12)
+    .create();
+
+  Logger.log('ensureDailyReportImportTrigger: removed %s old trigger(s), installed daily ~12:00 %s',
+    removed, Session.getScriptTimeZone());
+}
+
+// Runs daily via ensureDailyReportImportTrigger().
+// Idempotent: only reports not already in the folder are added.
 function importReportsFromGmail() {
   const folder = DriveApp.getFolderById(getReportsFolderId_());
   const threads = GmailApp.search('subject:"Portfolio Analysis" has:attachment newer_than:1y');
