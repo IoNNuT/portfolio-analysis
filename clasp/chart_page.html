@@ -1250,19 +1250,27 @@
     }
     document.getElementById(type + '-mv').textContent  = fmt(last.mv);
     document.getElementById(type + '-inv').textContent = fmt(last.invested);
+    // The P&L tile is price-only. ETF History's P&L column carries total return
+    // (price gain + received dividends), because recordPortfolioSnapshot_v1
+    // writes Summary's "TTL Return (Abs)" into it — so derive the price-only
+    // figure from MV - Invested instead. Stocks History's P&L is already
+    // price-only. Keep this in step with applyLiveTotals, which overwrites these
+    // same two tiles as soon as getLiveTotals returns.
+    const pnl    = type === 'etf' ? last.mv - last.invested : last.pnl;
+    const pnlPct = type === 'etf' ? (last.invested ? pnl / last.invested : 0) : last.pnlPct;
     const pnlEl = document.getElementById(type + '-pnl');
-    pnlEl.textContent = sign(last.pnl) + fmt(last.pnl);
-    pnlEl.className = 'stat-value ' + cls(last.pnl);
+    pnlEl.textContent = sign(pnl) + fmt(pnl);
+    pnlEl.className = 'stat-value ' + cls(pnl);
     const pctEl = document.getElementById(type + '-pct');
-    pctEl.textContent = sign(last.pnlPct) + fmtp(last.pnlPct);
-    pctEl.className = 'stat-value ' + cls(last.pnlPct);
+    pctEl.textContent = sign(pnlPct) + fmtp(pnlPct);
+    pctEl.className = 'stat-value ' + cls(pnlPct);
     document.getElementById('updated').textContent = 'LAST UPDATE ' + last.date;
   }
 
   // Live top-box stats, read straight from the Summary sheet (overrides the
-  // history-derived values from updateLatestStats). ETF's headline P&L is the
-  // total return (ttlReturn) and it shows an info-only Dividends tile; Stocks
-  // stays price-only (no dividends tracked).
+  // history-derived values from updateLatestStats). Both portfolios show a
+  // price-only headline P&L; ETF additionally carries an info-only Dividends
+  // tile alongside it.
   function setLiveStat(id, value, colored) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1273,12 +1281,12 @@
   function applyLiveTotals(totals) {
     if (totals && totals.etf) {
       const t   = totals.etf;
-      // Dividends are reinvested (bought back into the ETF), which inflates
-      // Invested — so the price-only P&L understates the real return. The
-      // headline P&L therefore uses total return (TTL Return = price gain +
-      // dividends); the Dividends tile stays as info only.
+      // Headline P&L is price-only — Summary's "P&L (Abs)". Received dividends
+      // are reported separately in their own tile rather than folded in, and are
+      // derived as TTL Return - P&L because the footer carries no standalone
+      // received-dividends total.
       const div = (t.ttlReturn != null && t.pnl != null) ? t.ttlReturn - t.pnl : 0;
-      const pnl = t.ttlReturn != null ? t.ttlReturn : (t.mv - t.invested);
+      const pnl = t.pnl != null ? t.pnl : (t.mv - t.invested);
       setLiveStat('etf-mv',  t.mv,       false);
       setLiveStat('etf-inv', t.invested, false);
       setLiveStat('etf-pnl', pnl,        true);
