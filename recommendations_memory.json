@@ -1,76 +1,76 @@
 {
-  "week_date": "2026-09-07",
+  "week_date": "2026-09-14",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 0.70 cheap, now below analyst target",
-      "catalyst": "Earnings 2026-09-10",
+      "thesis": "PEG 0.61 cheap, below target",
+      "catalyst": "JPMorgan trimmed target",
       "stance_since": "2026-08-17",
-      "price": 266.51,
-      "pnl_pct": 7.39
+      "price": 252.23,
+      "pnl_pct": 1.64
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Cloud+AI leader, 27% below target",
+      "thesis": "Cloud+AI leader, 27.8% below target",
       "catalyst": "Earnings 2026-10-29",
       "stance_since": "2026-06-01",
-      "price": 258.51,
-      "pnl_pct": 8.82
+      "price": 256.78,
+      "pnl_pct": 8.09
     },
     {
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "At target, awaiting 3% tax bracket",
+      "thesis": "Awaiting 3% tax bracket in 20d",
       "catalyst": "3% bracket 2026-10-03",
       "stance_since": "2026-06-01",
-      "price": 66.82,
-      "pnl_pct": 45.39
+      "price": 63.64,
+      "pnl_pct": 38.47
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "Agentforce ARR +200%, near target",
-      "catalyst": "",
+      "thesis": "Buybacks strong, 10% below target",
+      "catalyst": "GPT-6 disruption risk",
       "stance_since": "2026-08-17",
-      "price": 259.23,
-      "pnl_pct": 51.25
+      "price": 247.72,
+      "pnl_pct": 44.53
     },
     {
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "At fair value, EPS growth -20.6% weak",
-      "catalyst": "German Wegovy competition",
+      "thesis": "9.7% below target, EPS still weak",
+      "catalyst": "Morgan Stanley bearish call",
       "stance_since": "2026-06-01",
-      "price": 46.6,
-      "pnl_pct": 14.65
+      "price": 43.07,
+      "pnl_pct": 5.96
     },
     {
       "ticker": "UBER",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG improved 8.54 to 6.44, 34% upside",
+      "thesis": "PEG improved to 6.08, 41% upside",
       "catalyst": "Robotaxi competition watch",
       "stance_since": "2026-09-07",
-      "price": 75.76,
-      "pnl_pct": -1.28
+      "price": 71.67,
+      "pnl_pct": -6.61
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.36, CEO bought $1.17M post-selloff",
+      "thesis": "PEG 0.37, weak revenue/EPS growth",
       "catalyst": "PJM decision Mar-2027",
       "stance_since": "2026-06-01",
-      "price": 149.3,
-      "pnl_pct": -0.92
+      "price": 148.38,
+      "pnl_pct": -1.53
     }
   ]
 }
