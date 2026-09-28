@@ -1,76 +1,76 @@
 {
-  "week_date": "2026-09-21",
+  "week_date": "2026-09-28",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 0.60, 11.7% below target, cheap growth",
+      "thesis": "PEG 0.58, 18% below target, cheap growth",
       "catalyst": "AI pause debate pressures shares",
       "stance_since": "2026-08-17",
-      "price": 248.92,
-      "pnl_pct": 0.3
+      "price": 235.47,
+      "pnl_pct": -5.12
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "EPS +242%, 29% below target, high conviction",
-      "catalyst": "Earnings 2026-10-29; Burry AI liability warning",
+      "thesis": "EPS +242%, 32% below target, high conviction",
+      "catalyst": "Earnings Oct29; Burry AI liability warning",
       "stance_since": "2026-06-01",
-      "price": 253.71,
-      "pnl_pct": 6.8
+      "price": 249.67,
+      "pnl_pct": 5.1
     },
     {
       "ticker": "BMY",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "3% tax bracket in 13 days, profit lock",
-      "catalyst": "3% bracket 2026-10-03; bull case building",
+      "thesis": "3% tax bracket in 6 days, profit lock",
+      "catalyst": "Bracket flips Oct3; earnings Oct29",
       "stance_since": "2026-06-01",
-      "price": 63.06,
-      "pnl_pct": 37.21
+      "price": 62.86,
+      "pnl_pct": 36.77
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.80, 19% below target, buybacks strong",
-      "catalyst": "AIforce pricing shift; GPT-6 disruption risk",
+      "thesis": "PEG 0.78, 20% below target, buybacks strong",
+      "catalyst": "AIforce pricing shift; moat debate",
       "stance_since": "2026-08-17",
-      "price": 237.92,
-      "pnl_pct": 38.81
+      "price": 234.02,
+      "pnl_pct": 36.54
     },
     {
       "ticker": "NVO",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "8% below target, EPS growth still negative",
-      "catalyst": "GLP-1 patent-cliff valuation debate",
+      "thesis": "PEG 4.3, EPS -20.6%, patent-cliff concerns",
+      "catalyst": "Earnings Nov4; GLP-1 valuation debate",
       "stance_since": "2026-06-01",
-      "price": 43.24,
-      "pnl_pct": 6.38
+      "price": 38.8,
+      "pnl_pct": -4.54
     },
     {
       "ticker": "UBER",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 6.0, 44% below target, insider buying",
-      "catalyst": "Robotaxi competition watch",
+      "thesis": "PEG 5.9, 45% below target, insider buying",
+      "catalyst": "Robotaxi competition watch; earnings Nov3",
       "stance_since": "2026-09-07",
-      "price": 70.5,
-      "pnl_pct": -7.08
+      "price": 69.62,
+      "pnl_pct": -8.24
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.35, weak growth, AI power demand",
-      "catalyst": "PJM decision Mar-2027; Anthropic IPO power demand",
+      "thesis": "PEG 0.34, weak growth, AI power demand",
+      "catalyst": "PJM decision; Anthropic IPO power demand",
       "stance_since": "2026-06-01",
-      "price": 140.67,
-      "pnl_pct": -6.65
+      "price": 138.46,
+      "pnl_pct": -8.11
     }
   ]
 }
