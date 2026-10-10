@@ -218,11 +218,22 @@ function recordStocksSnapshot_v1() {
   const pnl    = totalMV - totalInvested;
   const pnlPct = pnl / totalInvested;
 
-  // Skip if all values match the last recorded row
+  // One row per day, keyed on the date — same rule as recordPortfolioSnapshot_v1
+  // (see the comment there). The old value-equality skip could silently drop a
+  // day whenever the four totals happened to match the previous row.
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) {
+    const lastDate = new Date(sheet.getRange(lastRow, 1).getValue());
+    lastDate.setHours(0, 0, 0, 0);
+    if (lastDate.getTime() === today.getTime()) {
+      Logger.log("recordStocksSnapshot_v1: skipped — %s is already recorded.", today.toDateString());
+      return;
+    }
     const last = sheet.getRange(lastRow, 2, 1, 4).getValues()[0];
-    if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) return;
+    if (last[0] === totalMV && last[1] === totalInvested && last[2] === pnl && last[3] === pnlPct) {
+      Logger.log("recordStocksSnapshot_v1: values identical to %s — recording anyway (market closed, or quotes stale).",
+        lastDate.toDateString());
+    }
   }
 
   const sp500Price = fetchCurrentSP500Price();

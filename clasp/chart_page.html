@@ -450,9 +450,10 @@
       <button class="range-btn active" onclick="setPeriod('etf', null, this)">ALL</button>
     </div>
   </div>
-  <div class="stats three">
+  <div class="stats">
     <div class="stat"><div class="stat-label">P&amp;L Change</div><div class="stat-value" id="etf-period-pnl">—</div></div>
-    <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="etf-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label">Return (TWR)</div><div class="stat-value" id="etf-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label" id="etf-period-vs-label">vs S&amp;P 500</div><div class="stat-value" id="etf-period-vs">—</div></div>
     <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="etf-period-range" style="font-size:13px">—</div></div>
   </div>
   <div class="stats-label">HOLDINGS</div>
@@ -570,9 +571,10 @@
       <button class="range-btn active" onclick="setPeriod('stocks', null, this)">ALL</button>
     </div>
   </div>
-  <div class="stats three">
+  <div class="stats">
     <div class="stat"><div class="stat-label">P&amp;L Change</div><div class="stat-value" id="stocks-period-pnl">—</div></div>
-    <div class="stat"><div class="stat-label">Return Change</div><div class="stat-value" id="stocks-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label">Return (TWR)</div><div class="stat-value" id="stocks-period-pct">—</div></div>
+    <div class="stat"><div class="stat-label" id="stocks-period-vs-label">vs S&amp;P 500</div><div class="stat-value" id="stocks-period-vs">—</div></div>
     <div class="stat"><div class="stat-label">Period</div><div class="stat-value neutral" id="stocks-period-range" style="font-size:13px">—</div></div>
   </div>
   <div class="stats-label">HOLDINGS</div>
@@ -1324,15 +1326,39 @@
     }
 
     const pnlChange = last.pnl - first.pnl;
-    const pctChange = last.pnlPct - first.pnlPct;
 
     const pnlEl = document.getElementById(type + '-period-pnl');
     pnlEl.textContent = sign(pnlChange) + fmt(pnlChange);
     pnlEl.className = 'stat-value ' + cls(pnlChange);
 
-    const pctEl = document.getElementById(type + '-period-pct');
-    pctEl.textContent = sign(pctChange) + fmtp(pctChange);
-    pctEl.className = 'stat-value ' + cls(pctChange);
+    // Period return is time-weighted (deposits stripped), the same figure the
+    // comparison chart ends on — NOT last.pnlPct − first.pnlPct, which is
+    // measured on total invested and drops on every deposit even if prices
+    // are flat.
+    const twrRows = rows.filter(d => d.mv > 0);
+    const twr     = twrRows.length > 1 ? computeTWR(twrRows).pop() / 100 : null;
+    const pctEl   = document.getElementById(type + '-period-pct');
+    pctEl.textContent = twr === null ? '—' : sign(twr) + fmtp(twr);
+    pctEl.className   = 'stat-value ' + (twr === null ? 'neutral' : cls(twr));
+
+    // vs S&P 500: percentage-point gap between the two comparison-chart lines.
+    const bench = benchmark(rows);
+    const vsEl  = document.getElementById(type + '-period-vs');
+    const vsLbl = document.getElementById(type + '-period-vs-label');
+    vsLbl.textContent = 'vs ' + bench.label;
+    if (bench.rows.length > 1) {
+      const b    = bench.rows;
+      const port = computeTWR(b).pop() / 100;
+      const idx  = b[b.length - 1][bench.key] / b[0][bench.key] - 1;
+      const gap  = port - idx;
+      vsEl.textContent = sign(gap) + (gap * 100).toFixed(2) + ' pp';
+      vsEl.title       = 'Portfolio ' + sign(port) + fmtp(port) + ' · S&P 500 ' + sign(idx) + fmtp(idx);
+      vsEl.className   = 'stat-value ' + cls(gap);
+    } else {
+      vsEl.textContent = '—';
+      vsEl.title       = '';
+      vsEl.className   = 'stat-value neutral';
+    }
 
     document.getElementById(type + '-period-range').textContent = first.date + ' → ' + last.date;
   }
@@ -1364,7 +1390,7 @@
         pointHoverRadius: 5,
         pointHoverBackgroundColor: '#a78bfa',
         fill: true,
-        tension: 0.3
+        tension: 0
       }];
     } else {
       datasets = [
@@ -1378,10 +1404,48 @@
           pointHoverRadius: 5,
           pointHoverBackgroundColor: '#4f8ef7',
           fill: true,
-          tension: 0.3
+          tension: 0
+        },
+        {
+          // Money put in. Steps up on deposits, so a deposit no longer reads
+          // as a gain: the gap between the two lines is the price P&L.
+          label: 'Invested (€)',
+          data: rows.map(d => d.invested),
+          borderColor: '#7c82a0',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#7c82a0',
+          fill: false,
+          stepped: 'after'
         }
       ];
     }
+
+    // Extra tooltip lines for ETF/Stocks: P&L and the change since the
+    // previous snapshot, split into deposits vs market move.
+    const afterBody = type === 'nw' ? undefined : items => {
+      const i = items[0].dataIndex;
+      const d = rows[i];
+      // ETF History's P&L includes received distributions, so it can exceed MV − Invested.
+      const pnlLabel = type === 'etf' ? 'P&L (incl. div.)' : 'P&L';
+      const lines = [''];
+      if (typeof d.pnl === 'number' && typeof d.pnlPct === 'number') {
+        lines.push(' ' + pnlLabel + ': ' + sign(d.pnl) + fmt(d.pnl) + ' (' + sign(d.pnlPct) + fmtp(d.pnlPct) + ')');
+      }
+      if (i > 0) {
+        const dMv  = d.mv - rows[i - 1].mv;
+        const dInv = (d.invested || 0) - (rows[i - 1].invested || 0);
+        lines.push(' Change: ' + sign(dMv) + fmt(dMv));
+        if (dInv !== 0) {
+          lines.push('   deposits: ' + sign(dInv) + fmt(dInv));
+          lines.push('   market:   ' + sign(dMv - dInv) + fmt(dMv - dInv));
+        }
+      }
+      return lines;
+    };
 
     charts[type] = new Chart(ctx, {
       type: 'line',
@@ -1409,7 +1473,8 @@
             bodyFont: { family: 'DM Mono', size: 12 },
             padding: 12,
             callbacks: {
-              label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y)
+              label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y),
+              afterBody
             }
           },
           zoom: {
@@ -1454,10 +1519,21 @@
     return result;
   }
 
+  // Benchmark series shared by the comparison chart and the period tiles, so
+  // both always agree: the stored ^GSPC level (USD price index).
+  function benchmark(rows) {
+    return {
+      key:   'sp500',
+      label: 'S&P 500',
+      rows:  rows.filter(d => d.sp500 !== null && d.sp500 > 0 && d.mv > 0)
+    };
+  }
+
   function buildComparisonChart(type, rows) {
     const loadingId = type + '-cmp-loading';
     const canvasId  = type + '-cmp-chart';
-    const validRows = rows.filter(d => d.sp500 !== null && d.sp500 > 0 && d.mv > 0);
+    const bench     = benchmark(rows);
+    const validRows = bench.rows;
 
     if (validRows.length < 2) {
       document.getElementById(loadingId).textContent = 'NO S&P 500 DATA — RUN BACKFILL FIRST';
@@ -1469,15 +1545,16 @@
     document.getElementById(loadingId).style.display = 'none';
     document.getElementById(canvasId).style.display = 'block';
 
-    const baseSP500 = validRows[0].sp500;
+    const k         = bench.key;
+    const baseSP500 = validRows[0][k];
     const labels    = validRows.map(d => d.date);
     const portRet   = computeTWR(validRows);
-    const sp500Ret  = validRows.map(d => (d.sp500 / baseSP500 - 1) * 100);
+    const sp500Ret  = validRows.map(d => (d[k] / baseSP500 - 1) * 100);
 
     const portDailyRet  = portRet.map((_, i) => i === 0 ? null :
       ((1 + portRet[i] / 100) / (1 + portRet[i - 1] / 100) - 1) * 100);
     const sp500DailyRet = validRows.map((d, i) => i === 0 ? null :
-      (d.sp500 / validRows[i - 1].sp500 - 1) * 100);
+      (d[k] / validRows[i - 1][k] - 1) * 100);
 
     const ctx = document.getElementById(canvasId).getContext('2d');
     if (compCharts[type]) compCharts[type].destroy();
@@ -1495,10 +1572,10 @@
             borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 5,
-            tension: 0.3
+            tension: 0
           },
           {
-            label: 'S&P 500',
+            label: bench.label,
             data: sp500Ret,
             borderColor: '#f7a24f',
             backgroundColor: 'transparent',
@@ -1506,7 +1583,7 @@
             borderDash: [6, 4],
             pointRadius: 0,
             pointHoverRadius: 5,
-            tension: 0.3
+            tension: 0
           }
         ]
       },
