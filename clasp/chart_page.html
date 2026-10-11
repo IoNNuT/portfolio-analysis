@@ -1290,7 +1290,9 @@
   function updateLatestStats(type, rows) {
     const last = rows[rows.length - 1];
     if (type === 'nw') {
-      document.getElementById('nw-value').textContent = fmt(last.netWorth);
+      // The live total (Accounts + allocation tab) wins over the last daily
+      // snapshot, whichever of the two server calls returns first.
+      document.getElementById('nw-value').textContent = fmt(nwLiveTotal != null ? nwLiveTotal : last.netWorth);
       document.getElementById('updated').textContent  = 'LAST UPDATE ' + last.date;
       return;
     }
@@ -2281,6 +2283,7 @@
   // animates at zero size and stays blank after the tab is opened.
   const nwPies = {};
   let nwPieSlices = null;
+  let nwLiveTotal = null;
   function drawNwPiesIfVisible() {
     if (!nwPieSlices || nwPies.assets) return;
     if (!document.getElementById('panel-networth').classList.contains('active')) return;
@@ -2342,6 +2345,8 @@
     const currencies = ((res && res.currencies) || [])
       .map((c, i) => ({ label: c.currency, value: c.value, color: OV_COLORS[i % OV_COLORS.length] }));
     const total = assets.reduce((s, a) => s + a.value, 0);
+    nwLiveTotal = total;
+    document.getElementById('nw-value').textContent = fmt(total);
     const weight = v => total > 0 ? (v / total * 100).toFixed(1) + '%' : '—';
 
     const tbody = document.querySelector('#nw-assets-table tbody');
