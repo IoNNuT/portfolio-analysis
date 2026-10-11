@@ -19,7 +19,7 @@ Records the ETF portfolio state from the Summary sheet into **ETF History**.
 Records the stocks portfolio state from the Summary sheet into **Stocks History**.
 
 #### `recordNetWorthSnapshot`
-Records the total net worth from the NetWorth sheet into **NetWorth History**.
+Computes net worth as the **Accounts** tab (bank accounts, deposits, property — one row per account, EUR value via `Utilities` FX rates, footer row `Total`) plus the allocation tab total (ETFs, stocks, BET, RO bonds), and records it with its breakdown into **NetWorth History**. Accounts rows are bucketed by Type: `Depozit` → deposits, `Property`/`Proprietate` → property (blank Type falls back to the Account name), anything else → cash. The old hand-maintained `NetWorth` sheet is no longer read. Run `verifyNetWorth` from the editor to check the numbers.
 
 ### History Sheet Format
 
@@ -28,8 +28,10 @@ Records the total net worth from the NetWorth sheet into **NetWorth History**.
 |------|-------------|-------------|---------|---------|
 
 **NetWorth History**
-| Date | Net Worth (€) |
-|------|--------------|
+| Date | Net Worth (€) | Cash (€) | Deposits (€) | Investments (€) | Property (€) |
+|------|--------------|----------|--------------|-----------------|--------------|
+
+Rows before 2026-10-11 have the total only; the breakdown starts from that date.
 
 ### Key Logic
 

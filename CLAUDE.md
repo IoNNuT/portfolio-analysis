@@ -22,7 +22,7 @@ This repo contains the **weekly analysis script**. It runs Mondays 10 AM, analyz
 | `seen_articles.db` | SQLite cache of article URLs (prevents duplicates across weekly runs) |
 | `parse_broker_csv.py` | Parses broker CSV exports (XTB, TradeVille, ING) and stores transactions in SQLite. **Not currently wired into the report** — see Investment Income below |
 | `clasp/` | Google Apps Script source files, managed with clasp CLI |
-| `clasp/automation.js` | Daily portfolio snapshot recording (ETF, Stocks, NetWorth history sheets) |
+| `clasp/automation.js` | Daily portfolio snapshot recording (ETF, Stocks, NetWorth history sheets). Net worth = `Accounts` tab + allocation tab total |
 | `clasp/chart.js` | Server-side Apps Script exposing data to the web dashboard |
 | `clasp/chart_page.html` | Interactive web dashboard frontend (Chart.js, dark theme, zoom/pan) + Library tab |
 | `clasp/reports.js` | Weekly Analysis Library: Gmail→Drive importer + dashboard read API (listReports/getReportHtml) |

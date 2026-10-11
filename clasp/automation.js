@@ -240,94 +240,99 @@ function recordStocksSnapshot_v1() {
   sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct, sp500Price]);
 }
 
+// ─────────────────────────────────────────────
+// Net worth = Accounts tab (bank accounts, deposits, property) + the
+// allocation tab total (ETFs, stocks, BET, RO bonds — live prices).
+// Replaces the old hand-maintained "NetWorth" sheet.
+//
+// Accounts layout: header row 1 with "Account", "Type" and "EUR value"
+// columns; rows end at the footer whose Account is "Total". Rows are bucketed
+// by Type: Depozit/Deposit → deposits, Property/Proprietate → property (a
+// blank Type falls back to the Account name, so "Proprietati" still counts as
+// property), anything else → cash.
+// ─────────────────────────────────────────────
+const ACCOUNTS_SHEET = "Accounts";
+const ALLOCATION_GID = 1124476629;
+const DEPOSIT_RE     = /depozit|deposit/i;
+const PROPERTY_RE    = /propr|property|real estate|imobil/i;
+
+function _readAccountsTotals_(sheet) {
+  const data   = sheet.getDataRange().getValues();
+  const header = data[0].map(h => String(h).trim().toLowerCase());
+  const idxAcc  = header.indexOf("account");
+  const idxType = header.indexOf("type");
+  const idxEur  = header.indexOf("eur value");
+  if (idxAcc === -1 || idxType === -1 || idxEur === -1) {
+    throw new Error('Accounts: header needs "Account", "Type" and "EUR value" columns');
+  }
+
+  const totals = { cash: 0, deposits: 0, property: 0 };
+  for (let i = 1; i < data.length; i++) {
+    const acc = String(data[i][idxAcc]).trim();
+    if (/^total$/i.test(acc)) break;
+    if (!acc) continue;
+
+    const eur = data[i][idxEur];
+    if (eur === "" || eur === null) continue;
+    if (typeof eur !== "number") {
+      throw new Error('Accounts row ' + (i + 1) + ' ("' + acc + '"): EUR value is not a number: ' + eur);
+    }
+
+    const type = String(data[i][idxType]).trim() || acc;
+    if (DEPOSIT_RE.test(type))       totals.deposits += eur;
+    else if (PROPERTY_RE.test(type)) totals.property += eur;
+    else                             totals.cash     += eur;
+  }
+  return totals;
+}
+
 function recordNetWorthSnapshot() {
-  const ss      = SpreadsheetApp.getActiveSpreadsheet();
-  const nwSheet = ss.getSheetByName("NetWorth");
-  if (!waitForSheetReady(nwSheet)) {
+  const ss       = SpreadsheetApp.getActiveSpreadsheet();
+  const accounts = ss.getSheetByName(ACCOUNTS_SHEET);
+  const alloc    = _sheetByGid_(ss, ALLOCATION_GID);
+  if (!accounts) throw new Error('recordNetWorthSnapshot: "' + ACCOUNTS_SHEET + '" sheet not found');
+  if (!alloc)    throw new Error("recordNetWorthSnapshot: allocation tab (gid " + ALLOCATION_GID + ") not found");
+
+  if (!waitForSheetReady(accounts) || !waitForSheetReady(alloc)) {
     Logger.log("recordNetWorthSnapshot: skipped — formula errors persisted after %s retries.", RETRY_CONFIG.MAX_RETRIES);
     return;
   }
 
-  // ── Adjust these to match your NetWorth sheet layout ──────────────────
-  const TOTAL_NET_WORTH_CELL   = "B2";
-  const TOTAL_ASSETS_CELL      = "B3";   // or set to null to skip
-  const TOTAL_LIABILITIES_CELL = "B4";   // or set to null to skip
-  // ──────────────────────────────────────────────────────────────────────
+  const acc         = _readAccountsTotals_(accounts);
+  const investments = getPortfolioStatus().total;  // chart.js — allocation tab "Total" row
+  const round2      = v => Math.round(v * 100) / 100;
 
-  const totalNetWorth    = nwSheet.getRange(TOTAL_NET_WORTH_CELL).getValue();
-  const totalAssets      = TOTAL_ASSETS_CELL      ? nwSheet.getRange(TOTAL_ASSETS_CELL).getValue()      : null;
-  const totalLiabilities = TOTAL_LIABILITIES_CELL ? nwSheet.getRange(TOTAL_LIABILITIES_CELL).getValue() : null;
+  const newValues = [
+    acc.cash + acc.deposits + acc.property + investments,
+    acc.cash, acc.deposits, investments, acc.property,
+  ].map(round2);
 
   let histSheet = ss.getSheetByName("NetWorth History");
   if (!histSheet) histSheet = ss.insertSheet("NetWorth History");
 
-  if (histSheet.getLastRow() === 0) {
-    const headers = ["Date", "Net Worth (€)"];
-    if (totalAssets !== null)      headers.push("Assets (€)");
-    if (totalLiabilities !== null) headers.push("Liabilities (€)");
-    histSheet.appendRow(headers);
-  }
+  // Rows recorded before 2026-10-11 only have Date + Net Worth; the breakdown
+  // columns are added on first run and stay blank for those older rows.
+  const headers = ["Date", "Net Worth (€)", "Cash (€)", "Deposits (€)", "Investments (€)", "Property (€)"];
+  histSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-
-  // Build new row values (excluding date) and compare against last recorded
-  const newValues = [totalNetWorth];
-  if (totalAssets !== null)      newValues.push(totalAssets);
-  if (totalLiabilities !== null) newValues.push(totalLiabilities);
-
+  // Skip if nothing changed since the last recorded row (weekends, holidays)
   const lastRow = histSheet.getLastRow();
   if (lastRow > 1) {
     const last = histSheet.getRange(lastRow, 2, 1, newValues.length).getValues()[0];
     if (newValues.every((val, i) => val === last[i])) return;
   }
 
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   histSheet.appendRow([today, ...newValues]);
 }
 
-function recordNetWorthSnapshot() {
-  const ss       = SpreadsheetApp.getActiveSpreadsheet();
-  const nwSheet  = ss.getSheetByName("NetWorth");
-  if (!waitForSheetReady(nwSheet)) {
-    Logger.log("recordNetWorthSnapshot: skipped — formula errors persisted after %s retries.", RETRY_CONFIG.MAX_RETRIES);
-    return;
-  }
-
-  // ── Adjust these to match your NetWorth sheet layout ──────────────────
-  const TOTAL_NET_WORTH_CELL = "C9";   // cell that holds your total net worth (€)
-  const TOTAL_ASSETS_CELL    = "";   // cell that holds total assets — or set to null to skip
-  const TOTAL_LIABILITIES_CELL = ""; // cell that holds total liabilities — or set to null to skip
-  // ──────────────────────────────────────────────────────────────────────
-
-  const totalNetWorth   = nwSheet.getRange(TOTAL_NET_WORTH_CELL).getValue();
-  const totalAssets     = TOTAL_ASSETS_CELL     ? nwSheet.getRange(TOTAL_ASSETS_CELL).getValue()     : null;
-  const totalLiabilities = TOTAL_LIABILITIES_CELL ? nwSheet.getRange(TOTAL_LIABILITIES_CELL).getValue() : null;
-
-  let histSheet = ss.getSheetByName("NetWorth History");
-  if (!histSheet) histSheet = ss.insertSheet("NetWorth History");
-
-  if (histSheet.getLastRow() === 0) {
-    const headers = ["Date", "Net Worth (€)"];
-    if (totalAssets !== null)      headers.push("Assets (€)");
-    if (totalLiabilities !== null) headers.push("Liabilities (€)");
-    histSheet.appendRow(headers);
-  }
-
-  // ── Skip if net worth hasn't changed since the last recorded row ───────
-  const lastRow = histSheet.getLastRow();
-  if (lastRow > 1) {
-    const lastNetWorth = histSheet.getRange(lastRow, 2).getValue();
-    if (lastNetWorth === totalNetWorth) return;
-  }
-  // ──────────────────────────────────────────────────────────────────────
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const row = [today, totalNetWorth];
-  if (totalAssets !== null)      row.push(totalAssets);
-  if (totalLiabilities !== null) row.push(totalLiabilities);
-
-  histSheet.appendRow(row);
+// Run manually from the editor to check the numbers before trusting the trigger.
+function verifyNetWorth() {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const acc = _readAccountsTotals_(ss.getSheetByName(ACCOUNTS_SHEET));
+  const inv = getPortfolioStatus().total;
+  Logger.log("Cash %s | Deposits %s | Property %s | Investments %s | Net worth %s",
+    acc.cash, acc.deposits, acc.property, inv, acc.cash + acc.deposits + acc.property + inv);
 }
 
 // ─────────────────────────────────────────────
