@@ -742,6 +742,49 @@
       <canvas id="nw-chart" style="display:none"></canvas>
     </div>
   </div>
+  <div class="stats-label">ASSET ALLOCATION — LIVE</div>
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Asset Spread</div>
+        <div class="toolbar-right">
+          <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div id="nw-assets-loading" class="loading">LOADING DATA...</div>
+        <canvas id="nw-assets-chart" style="display:none"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-toolbar">
+        <div class="chart-title">Investments by Currency</div>
+        <div class="toolbar-right">
+          <button class="icon-btn" onclick="toggleFullscreen(this)" title="Fullscreen">⛶</button>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div id="nw-ccy-loading" class="loading">LOADING DATA...</div>
+        <canvas id="nw-ccy-chart" style="display:none"></canvas>
+      </div>
+      <div class="hint">ETFs, stocks and bonds, by listing currency — converted to €</div>
+    </div>
+  </div>
+  <div class="holdings-card">
+    <div class="table-wrap">
+      <table class="holdings" id="nw-assets-table" style="width:100%">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="num">Value (€)</th>
+            <th class="num">Weight</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- LIBRARY PANEL -->
@@ -980,6 +1023,7 @@
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + tab).classList.add('active');
+    if (tab === 'networth') drawNwPiesIfVisible();
     if (tab === 'addtx') {
       const today = new Date().toISOString().slice(0, 10);
       // default all transaction + deposit date pickers to today
@@ -1834,6 +1878,7 @@
     if (etfTotalsChart) etfTotalsChart.resize();
     if (etfAllocChart) etfAllocChart.resize();
     if (ovChart) ovChart.resize();
+    Object.values(nwPies).forEach(c => c && c.resize());
   }
   document.addEventListener('fullscreenchange', resizeAllCharts);
   document.addEventListener('webkitfullscreenchange', resizeAllCharts);
@@ -2228,6 +2273,105 @@
     .withSuccessHandler(renderOverview)
     .withFailureHandler(e => document.getElementById('ov-loading').textContent = 'ERROR: ' + e.message)
     .getPortfolioStatus();
+
+  // ── NET WORTH: live asset spread (pie + table) and investments by currency ──
+  // Slices carry their colour so a zero-value row skipped by the pie still keeps
+  // the table's swatches aligned with the pie. The pies are drawn only once the
+  // Net Worth panel is visible: a doughnut built inside a display:none panel
+  // animates at zero size and stays blank after the tab is opened.
+  const nwPies = {};
+  let nwPieSlices = null;
+  function drawNwPiesIfVisible() {
+    if (!nwPieSlices || nwPies.assets) return;
+    if (!document.getElementById('panel-networth').classList.contains('active')) return;
+    buildNwDoughnut('assets', 'nw-assets-chart', 'nw-assets-loading', nwPieSlices.assets);
+    buildNwDoughnut('ccy',    'nw-ccy-chart',    'nw-ccy-loading',    nwPieSlices.currencies);
+  }
+  function buildNwDoughnut(key, canvasId, loadingId, slices) {
+    const loading = document.getElementById(loadingId);
+    const canvas  = document.getElementById(canvasId);
+    const shown   = slices.filter(s => s.value > 0);
+    if (!shown.length) { loading.textContent = 'NO DATA'; return; }
+
+    const total = shown.reduce((s, r) => s + r.value, 0);
+    loading.style.display = 'none';
+    canvas.style.display  = 'block';
+    if (nwPies[key]) nwPies[key].destroy();
+
+    nwPies[key] = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: shown.map(s => s.label),
+        datasets: [{
+          data: shown.map(s => s.value),
+          backgroundColor: shown.map(s => s.color),
+          borderColor: '#13161e',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#7c82a0', font: { family: 'DM Mono', size: 11 }, boxWidth: 12, padding: 14 }
+          },
+          tooltip: {
+            backgroundColor: '#1e2330',
+            titleColor: '#7c82a0',
+            bodyColor: '#e8eaf2',
+            borderColor: '#2a3045',
+            borderWidth: 1,
+            titleFont: { family: 'DM Mono', size: 11 },
+            bodyFont: { family: 'DM Mono', size: 12 },
+            padding: 12,
+            callbacks: {
+              label: ctx => ' ' + ctx.label + ': ' + fmt(ctx.parsed) + '  (' + (ctx.parsed / total * 100).toFixed(1) + '%)'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderNetWorthBreakdown(res) {
+    const assets = ((res && res.assets) || [])
+      .map((a, i) => ({ label: a.category, value: a.value, color: OV_COLORS[i % OV_COLORS.length] }));
+    const currencies = ((res && res.currencies) || [])
+      .map((c, i) => ({ label: c.currency, value: c.value, color: OV_COLORS[i % OV_COLORS.length] }));
+    const total = assets.reduce((s, a) => s + a.value, 0);
+    const weight = v => total > 0 ? (v / total * 100).toFixed(1) + '%' : '—';
+
+    const tbody = document.querySelector('#nw-assets-table tbody');
+    tbody.innerHTML = '';
+    assets.forEach(a => {
+      const tr = document.createElement('tr');
+      const c1 = document.createElement('td');
+      c1.innerHTML = '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;' +
+        'margin-right:8px;vertical-align:middle;background:' + a.color + '"></span>';
+      c1.appendChild(document.createTextNode(a.label));
+      const c2 = document.createElement('td'); c2.className = 'num'; c2.textContent = fmt(a.value);
+      const c3 = document.createElement('td'); c3.className = 'num'; c3.textContent = weight(a.value);
+      tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3);
+      tbody.appendChild(tr);
+    });
+    document.querySelector('#nw-assets-table tfoot').innerHTML =
+      '<tr style="font-weight:600;border-top:1px solid var(--border)">' +
+      '<td>Total</td><td class="num">' + fmt(total) + '</td><td class="num">100%</td></tr>';
+
+    nwPieSlices = { assets: assets, currencies: currencies };
+    drawNwPiesIfVisible();
+  }
+
+  google.script.run
+    .withSuccessHandler(renderNetWorthBreakdown)
+    .withFailureHandler(e => {
+      document.getElementById('nw-assets-loading').textContent = 'ERROR: ' + e.message;
+      document.getElementById('nw-ccy-loading').textContent    = 'ERROR: ' + e.message;
+    })
+    .getNetWorthBreakdown();
 
   // Load all three in parallel
   google.script.run.withSuccessHandler(rows => initPanel('etf', rows))

@@ -88,7 +88,7 @@ To view updated data, simply **reload the browser tab** — no redeployment need
 Three tabs, one per investment category:
 - **ETF** — reads from ETF History
 - **Stocks** — reads from Stocks History
-- **Net Worth** — reads from NetWorth History
+- **Net Worth** — reads from NetWorth History, plus a live **Asset Allocation** section (`getNetWorthBreakdown` in `chart.js`): an Asset Spread doughnut and table (Cash + Deposits, Property, ETFs (EU), BET ETF, Stocks, Bonds — from the Accounts tab and the allocation tab) and an Investments by Currency doughnut (allocation tab only, currency read from the symbol in its native "Value" column). All values in €.
 
 ### Holdings Tables
 

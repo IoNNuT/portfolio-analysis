@@ -430,7 +430,9 @@ function _sheetByGid_(ss, gid) {
 // display strings with currency symbols ("€31,805.05"), so values are regex-
 // stripped to numbers. The sheet's own "Total" row is returned as `total`; the
 // breakdown `rows` excludes it. Zero-value rows (e.g. Crypto) are kept so they
-// still appear in the table. Returns { rows: [{category, value}], total } in €.
+// still appear in the table. Returns { rows: [{category, value, currency}], total }
+// in €; `currency` (EUR/USD/RON, or null) is read from the symbol in the native
+// "Value" column, so it follows the sheet if a holding's listing currency changes.
 function getPortfolioStatus() {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = _sheetByGid_(ss, 1124476629);
@@ -447,6 +449,7 @@ function getPortfolioStatus() {
 
   const header = disp[0].map(norm);
   const idxCat = header.indexOf("category");
+  const idxVal = header.indexOf("value");
   let   idxEur = header.indexOf("value euro");
   if (idxEur === -1) idxEur = header.indexOf("value eur");
   if (idxCat === -1 || idxEur === -1) return { rows: [], total: 0 };
@@ -458,10 +461,60 @@ function getPortfolioStatus() {
     if (!cat) continue;
     const val = num(disp[i][idxEur]);
     if (/total/i.test(cat)) { total = val; continue; }
-    rows.push({ category: cat, value: val });
+    rows.push({ category: cat, value: val, currency: idxVal === -1 ? null : _currencyOf_(disp[i][idxVal]) });
   }
   if (total === null) total = rows.reduce((s, r) => s + r.value, 0);
   return { rows: rows, total: total };
+}
+
+function _currencyOf_(display) {
+  const v = String(display);
+  if (v.indexOf("€") !== -1)  return "EUR";
+  if (v.indexOf("$") !== -1)  return "USD";
+  if (/ron|lei/i.test(v))     return "RON";
+  return null;
+}
+
+// Live asset spread for the Net Worth tab, all in €. `assets` buckets the
+// Accounts tab (cash + deposits, property) and the allocation tab (EU ETFs,
+// the BET ETF, stocks, bonds; any other non-zero category such as crypto keeps
+// its own slice). `currencies` splits the investments only (allocation tab,
+// not bank accounts or property) by listing currency.
+function getNetWorthBreakdown() {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const acc    = _readAccountsTotals_(ss.getSheetByName(ACCOUNTS_SHEET));  // automation.js
+  const status = getPortfolioStatus();
+
+  const buckets = { ETFs: 0, BET: 0, Stocks: 0, Bonds: 0 };
+  const other   = {};
+  const byCcy   = {};
+  status.rows.forEach(r => {
+    if (!r.value) return;
+    if (/bond/i.test(r.category))      buckets.Bonds  += r.value;
+    else if (/bet/i.test(r.category))  buckets.BET    += r.value;  // before /etf/: "RO BETETF"
+    else if (/etf/i.test(r.category))  buckets.ETFs   += r.value;
+    else if (/stock/i.test(r.category)) buckets.Stocks += r.value;
+    else other[r.category] = (other[r.category] || 0) + r.value;
+
+    const ccy = r.currency || "Other";
+    byCcy[ccy] = (byCcy[ccy] || 0) + r.value;
+  });
+
+  const assets = [
+    { category: "Cash + Deposits", value: acc.cash + acc.deposits },
+    { category: "Property",        value: acc.property },
+    { category: "ETFs",            value: buckets.ETFs },
+    { category: "BET ETF",         value: buckets.BET },
+    { category: "Stocks",          value: buckets.Stocks },
+    { category: "Bonds",           value: buckets.Bonds },
+  ];
+  Object.keys(other).forEach(k => assets.push({ category: k, value: other[k] }));
+
+  const currencies = Object.keys(byCcy)
+    .map(k => ({ currency: k, value: byCcy[k] }))
+    .sort((a, b) => b.value - a.value);
+
+  return { assets: assets, currencies: currencies };
 }
 
 function getNetWorthData() {
