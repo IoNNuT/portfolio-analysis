@@ -1,76 +1,76 @@
 {
-  "week_date": "2026-10-12",
+  "week_date": "2026-10-19",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 0.58, 18% below target, cheap growth",
-      "catalyst": "AI pause debate pressures shares",
+      "thesis": "PEG 0.58, cheap growth, 18% below target",
+      "catalyst": "AI pause debate; CRM comparison pressure",
       "stance_since": "2026-08-17",
-      "price": 242.27,
-      "pnl_pct": -2.38
+      "price": 245.2,
+      "pnl_pct": -1.2
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "EPS +242%, 32% below target, high conviction",
-      "catalyst": "Earnings Oct29; Decart AI deal talks",
+      "thesis": "EPS +242%, 32% below target",
+      "catalyst": "Earnings Oct29; bullish soar prediction",
       "stance_since": "2026-06-01",
-      "price": 262.43,
-      "pnl_pct": 10.47
+      "price": 250.0,
+      "pnl_pct": 5.24
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.78, 20% below target, buybacks strong",
-      "catalyst": "Software sector rebound; AIforce pricing shift",
+      "thesis": "PEG 0.78, 20% below target, buybacks",
+      "catalyst": "Double upgrade; AI pricing momentum",
       "stance_since": "2026-08-17",
-      "price": 229.13,
-      "pnl_pct": 33.69
+      "price": 240.7,
+      "pnl_pct": 40.44
     },
     {
       "ticker": "IONQ",
       "stance": "HOLD",
-      "conviction": "low",
-      "thesis": "New position, tiny profit, high volatility",
-      "catalyst": "Quantum sector competition watch",
-      "stance_since": "2026-10-12",
-      "price": 39.89,
-      "pnl_pct": 1.32
+      "conviction": "medium",
+      "thesis": "Speculative quantum leader, early-stage, high vol",
+      "catalyst": "Quantum selloff; long-term 10x bull case",
+      "stance_since": "2026-10-19",
+      "price": 31.28,
+      "pnl_pct": -20.55
     },
     {
       "ticker": "NVO",
-      "stance": "HOLD",
+      "stance": "SELL",
       "conviction": "medium",
-      "thesis": "PEG 4.3, EPS -20.6%, patent-cliff concerns",
-      "catalyst": "Earnings Nov4; GLP-1 valuation debate",
-      "stance_since": "2026-06-01",
-      "price": 38.64,
-      "pnl_pct": -4.94
+      "thesis": "Patent cliff, EPS -20.6%, Lilly threat",
+      "catalyst": "Lilly EMA win pressures GLP-1 share",
+      "stance_since": "2026-10-19",
+      "price": 38.83,
+      "pnl_pct": -4.47
     },
     {
       "ticker": "UBER",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 5.9, 45% below target, insider buying",
-      "catalyst": "Earnings Nov3; Q3 growth guidance 35%",
+      "thesis": "PEG 5.9, 45% below target",
+      "catalyst": "Earnings Nov3; insider buying",
       "stance_since": "2026-09-07",
-      "price": 71.51,
-      "pnl_pct": -5.75
+      "price": 70.35,
+      "pnl_pct": -7.28
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.34, weak growth, AI power demand",
-      "catalyst": "PJM decision; post-rally volatility risk",
+      "thesis": "PEG 0.34, AI power demand growth",
+      "catalyst": "PJM decision; preferred redemption",
       "stance_since": "2026-06-01",
-      "price": 161.48,
-      "pnl_pct": 7.16
+      "price": 152.02,
+      "pnl_pct": 0.88
     }
   ]
 }
