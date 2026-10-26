@@ -1,76 +1,76 @@
 {
-  "week_date": "2026-10-19",
+  "week_date": "2026-10-26",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
       "ticker": "ADBE",
       "stance": "HOLD",
       "conviction": "medium",
-      "thesis": "PEG 0.58, cheap growth, 18% below target",
-      "catalyst": "AI pause debate; CRM comparison pressure",
+      "thesis": "Cheap growth, record quarter, raised guidance",
+      "catalyst": "AI pause debate; CRM pricing pressure",
       "stance_since": "2026-08-17",
-      "price": 245.2,
-      "pnl_pct": -1.2
+      "price": 263.82,
+      "pnl_pct": 6.31
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "EPS +242%, 32% below target",
-      "catalyst": "Earnings Oct29; bullish soar prediction",
+      "thesis": "EPS growth, 32% below target, AI tie-up",
+      "catalyst": "Earnings Oct29; SpaceX-Tesla speculation",
       "stance_since": "2026-06-01",
-      "price": 250.0,
-      "pnl_pct": 5.24
+      "price": 248.0,
+      "pnl_pct": 4.4
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "PEG 0.78, 20% below target, buybacks",
-      "catalyst": "Double upgrade; AI pricing momentum",
+      "thesis": "PEG 0.78, buybacks, AI pricing momentum",
+      "catalyst": "New agent metering pricing Nov",
       "stance_since": "2026-08-17",
-      "price": 240.7,
-      "pnl_pct": 40.44
+      "price": 248.57,
+      "pnl_pct": 45.03
     },
     {
       "ticker": "IONQ",
       "stance": "HOLD",
       "conviction": "medium",
       "thesis": "Speculative quantum leader, early-stage, high vol",
-      "catalyst": "Quantum selloff; long-term 10x bull case",
+      "catalyst": "University quantum centre partnership",
       "stance_since": "2026-10-19",
-      "price": 31.28,
-      "pnl_pct": -20.55
+      "price": 31.27,
+      "pnl_pct": -20.57
     },
     {
       "ticker": "NVO",
       "stance": "SELL",
       "conviction": "medium",
-      "thesis": "Patent cliff, EPS -20.6%, Lilly threat",
-      "catalyst": "Lilly EMA win pressures GLP-1 share",
+      "thesis": "Patent cliff, Lilly threat, weak EPS",
+      "catalyst": "Lilly EMA win pressures GLP-1",
       "stance_since": "2026-10-19",
-      "price": 38.83,
-      "pnl_pct": -4.47
+      "price": 39.05,
+      "pnl_pct": -3.93
     },
     {
       "ticker": "UBER",
       "stance": "HOLD",
       "conviction": "medium",
       "thesis": "PEG 5.9, 45% below target",
-      "catalyst": "Earnings Nov3; insider buying",
+      "catalyst": "Earnings Nov3; Instacart sale talks",
       "stance_since": "2026-09-07",
-      "price": 70.35,
-      "pnl_pct": -7.28
+      "price": 66.7,
+      "pnl_pct": -12.09
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
-      "conviction": "high",
-      "thesis": "PEG 0.34, AI power demand growth",
-      "catalyst": "PJM decision; preferred redemption",
+      "conviction": "medium",
+      "thesis": "PEG 0.34 but demand thesis questioned",
+      "catalyst": "AI power demand reset debate",
       "stance_since": "2026-06-01",
-      "price": 152.02,
-      "pnl_pct": 0.88
+      "price": 140.16,
+      "pnl_pct": -6.99
     }
   ]
 }
