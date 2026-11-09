@@ -1,5 +1,5 @@
 {
-  "week_date": "2026-11-02",
+  "week_date": "2026-11-09",
   "source": "Auto-exported recommendation memory snapshot. Durable copy of the ledger that survives an Actions cache eviction and re-seeds a fresh DB. Regenerated every run \u2014 do not hand-edit.",
   "recommendations": [
     {
@@ -9,68 +9,68 @@
       "thesis": "Cheap growth, record quarter, raised guidance",
       "catalyst": "AI pause debate; CRM pricing pressure",
       "stance_since": "2026-08-17",
-      "price": 250.23,
-      "pnl_pct": 0.83
+      "price": 239.3,
+      "pnl_pct": -3.57
     },
     {
       "ticker": "AMZN",
       "stance": "HOLD",
       "conviction": "high",
-      "thesis": "EPS growth intact, still below target",
-      "catalyst": "Oct29 earnings: AWS/capex concerns, AI tie-up",
+      "thesis": "EPS growth intact, AWS reaccelerating",
+      "catalyst": "AWS 39% growth, guided >40% 2027-28",
       "stance_since": "2026-06-01",
-      "price": 240.35,
-      "pnl_pct": 1.18
+      "price": 259.3,
+      "pnl_pct": 9.15
     },
     {
       "ticker": "CRM",
       "stance": "HOLD",
       "conviction": "high",
       "thesis": "PEG 0.78, buybacks, AI pricing momentum",
-      "catalyst": "Rune M&A deal; Nov agent pricing",
+      "catalyst": "Rune M&A; near 3% tax threshold",
       "stance_since": "2026-08-17",
-      "price": 229.17,
-      "pnl_pct": 33.71
+      "price": 213.65,
+      "pnl_pct": 24.65
     },
     {
       "ticker": "IONQ",
       "stance": "HOLD",
-      "conviction": "low",
-      "thesis": "Speculative quantum leader, early-stage, high vol",
-      "catalyst": "Deepening loss trend, no stabilization yet",
+      "conviction": "medium",
+      "thesis": "Speculative quantum leader, early-stage",
+      "catalyst": "2027 capacity sold out, 85% upside target",
       "stance_since": "2026-10-19",
-      "price": 30.04,
-      "pnl_pct": -23.7
+      "price": 32.62,
+      "pnl_pct": -17.15
     },
     {
       "ticker": "NVO",
       "stance": "SELL",
       "conviction": "medium",
       "thesis": "Patent cliff, Lilly threat, weak EPS",
-      "catalyst": "Lilly EMA win pressures GLP-1",
+      "catalyst": "Lilly GLP-1 pressure persists",
       "stance_since": "2026-10-19",
-      "price": 40.0,
-      "pnl_pct": -1.59
+      "price": 40.31,
+      "pnl_pct": -0.83
     },
     {
       "ticker": "UBER",
       "stance": "HOLD",
       "conviction": "medium",
       "thesis": "PEG 5.9, 45% below target",
-      "catalyst": "Earnings Nov3; robotaxi pressure narrative",
+      "catalyst": "Q3 call, Ackman stake support",
       "stance_since": "2026-09-07",
-      "price": 65.25,
-      "pnl_pct": -14.0
+      "price": 68.59,
+      "pnl_pct": -9.6
     },
     {
       "ticker": "VST",
       "stance": "HOLD",
-      "conviction": "medium",
+      "conviction": "low",
       "thesis": "PEG 0.34, power demand thesis",
-      "catalyst": "Cogentrix acquisition adds 5.5GW capacity",
+      "catalyst": "TX data-center permitting risk, Dem sweep",
       "stance_since": "2026-06-01",
-      "price": 138.37,
-      "pnl_pct": -8.17
+      "price": 124.8,
+      "pnl_pct": -17.18
     }
   ]
 }
