@@ -144,7 +144,41 @@ function verifyTotals() {
 //   sheet.appendRow([today, totalMV, totalInvested, pnl, pnlPct]);
 // }
 
+// ─────────────────────────────────────────────
+// Trigger wrapper for the daily snapshots.
+//
+// "Service Spreadsheets failed while accessing document" is a transient
+// Google-side error, most likely when the snapshot triggers hit this heavy
+// (GOOGLEFINANCE-laden) spreadsheet at the same time. The script lock runs
+// them one at a time; the retry covers the remaining blips. Retrying is safe:
+// each snapshot appends its row as the very last step and dedupes on date
+// (or values, for net worth).
+// ─────────────────────────────────────────────
+const TRANSIENT_RE = /Service Spreadsheets|Service error|timed out|Address unavailable/i;
+
+function runSnapshot_(name, fn) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5 * 60 * 1000)) throw new Error(name + ": could not get the script lock in 5 min");
+  try {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return fn();
+      } catch (e) {
+        if (attempt >= 3 || !TRANSIENT_RE.test(String(e))) throw e;
+        Logger.log("%s: attempt %s failed (%s), retrying in %ss…", name, attempt, e, 30 * attempt);
+        Utilities.sleep(30 * 1000 * attempt);
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function recordPortfolioSnapshot_v1() {
+  runSnapshot_("recordPortfolioSnapshot_v1", _recordPortfolioSnapshot_);
+}
+
+function _recordPortfolioSnapshot_() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const summary = ss.getSheetByName("Summary");
   if (!waitForSheetReady(summary)) {
@@ -198,6 +232,10 @@ function recordPortfolioSnapshot_v1() {
 }
 
 function recordStocksSnapshot_v1() {
+  runSnapshot_("recordStocksSnapshot_v1", _recordStocksSnapshot_);
+}
+
+function _recordStocksSnapshot_() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const summary = ss.getSheetByName("Summary");
   if (!waitForSheetReady(summary)) {
@@ -287,6 +325,10 @@ function _readAccountsTotals_(sheet) {
 }
 
 function recordNetWorthSnapshot() {
+  runSnapshot_("recordNetWorthSnapshot", _recordNetWorthSnapshot_);
+}
+
+function _recordNetWorthSnapshot_() {
   const ss       = SpreadsheetApp.getActiveSpreadsheet();
   const accounts = ss.getSheetByName(ACCOUNTS_SHEET);
   const alloc    = _sheetByGid_(ss, ALLOCATION_GID);
